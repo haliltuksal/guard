@@ -1,0 +1,12 @@
+[project]
+name = "nobetci-model"
+version = "0.1.0"
+description = "Nöbetçi yüz tanıma modeli: indirme, Core ML dönüşümü, eşitlik testi"
+requires-python = ">=3.11"
+dependencies = [
+    "torch",
+    "facenet-pytorch",
+    "coremltools>=8.0",
+    "numpy",
+    "pillow",
+]

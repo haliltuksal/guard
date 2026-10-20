@@ -20,7 +20,9 @@ fi
 sed "s/__VERSION__/$VERSION/g" Resources/Info.plist > "$APP/Contents/Info.plist"
 
 [ -f build/Nobetci.icns ] && cp build/Nobetci.icns "$APP/Contents/Resources/Nobetci.icns"
-[ -d build/Model.mlmodelc ] && cp -R build/Model.mlmodelc "$APP/Contents/Resources/"
+# Model .mlpackage olarak paketlenir; uygulama ilk açılışta MLModel.compileModel ile
+# .mlmodelc'ye derleyip önbelleğe alır (Xcode/coremlcompiler gerekmez — V10).
+[ -d build/Model.mlpackage ] && cp -R build/Model.mlpackage "$APP/Contents/Resources/"
 if [ -d Resources/LaunchAgents ]; then
   cp Resources/LaunchAgents/*.plist "$APP/Contents/Resources/" 2>/dev/null || true
 fi

@@ -24,4 +24,8 @@ app: ; ./scripts/bundle.sh && ./scripts/sign.sh
 
 cert: ; ./scripts/make-cert.sh
 
+model: ; ./scripts/build-model.sh
+
+eval: ; @echo "LFW eşik kalibrasyonu (D14) Faz 4 hizalama hattı + veri seti gerektirir; bkz docs/model-evaluation.md"
+
 clean: ; rm -rf .build build
