@@ -14,7 +14,9 @@ def main() -> int:
         print("kullanım: coverage_gate.py <rapor> <modül> <eşik>", file=sys.stderr)
         return 2
     report, module, threshold = sys.argv[1], sys.argv[2], float(sys.argv[3])
-    needle = f"Sources/{module}/"
+    # llvm-cov report ortak öneki kırpar; yollar "NobetciCore/..." biçiminde gelir
+    # (Sources/ öneki olmadan). Modül adı + "/" ile eşle.
+    needle = f"{module}/"
     covered = total = 0
     for line in open(report, encoding="utf-8"):
         if needle not in line:

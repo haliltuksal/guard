@@ -15,6 +15,13 @@ public struct OwnerPresence {
 
     public var hasVerifiedTrack: Bool { verified }
 
+    /// Sahip olduğu bilinen bir anda (nöbet başlangıcı, kilit açılışı) izi doğrulanmış sayar.
+    public mutating func seedPresent(now: TimeInterval) {
+        verified = true
+        consecutiveOwnerFrames = Self.framesToVerify
+        lastOwnerSeen = now
+    }
+
     public mutating func update(match: MatchResult, trackAlive: Bool, now: TimeInterval) -> Presence {
         guard trackAlive else {
             // İz koptu: doğrulama düşer, yeni iz baştan doğrulanmalı.
