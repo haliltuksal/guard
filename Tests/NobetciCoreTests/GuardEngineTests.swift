@@ -26,6 +26,15 @@ private func contains(_ effects: [GuardEffect], lock reason: LockReason) -> Bool
     effects.contains(.logEvent(.triggered(reason)))
 }
 
+/// Gerçek akış: sahip görünür (t=0; gözlem saati burada başlar), sonra kadrajdan çıkar (t=2,0 → 1,5 sn aşıldı → "yok").
+/// Tohum, kamera asenkron açılırken eskimez; o yüzden "yok" için önce bir gözlem gerekir.
+private func leave(_ e: inout GuardEngine) {
+    _ = e.handle(.frame(ownerFrame(at: 0)))
+    var empty = FrameSummary.empty
+    empty.timestamp = 2.0
+    _ = e.handle(.frame(empty))
+}
+
 // Başlatma ---------------------------------------------------------------
 
 @Test func startPreparesThenGuardsPresent() {
@@ -81,14 +90,14 @@ private func contains(_ effects: [GuardEffect], lock reason: LockReason) -> Bool
 @Test func inputLocksOnlyWhenOwnerAbsent() {
     var e = started()
     #expect(e.handle(.input).isEmpty)           // sahip varken girdi serbest
-    _ = e.handle(.frame({ var f = FrameSummary.empty; f.timestamp = 2.0; return f }()))  // absent
+    leave(&e)  // absent
     let fx = e.handle(.input)
     #expect(contains(fx, lock: .input))
 }
 
 @Test func facelessPersonRequiresPriorEmptyScene() {
     var e = started()
-    _ = e.handle(.frame({ var f = FrameSummary.empty; f.timestamp = 2.0; return f }()))  // absent
+    leave(&e)  // absent
     // Sahne yeni boşaldı: gövde T2'yi tetiklemez.
     var soon = FrameSummary.empty; soon.bodyPresentBeyondThreshold = true; soon.sceneEmptyFor = 0.5; soon.timestamp = 2.5
     #expect(e.handle(.frame(soon)).isEmpty)
@@ -101,7 +110,7 @@ private func contains(_ effects: [GuardEffect], lock reason: LockReason) -> Bool
 
 @Test func cameraLossLocksButSensorLossOnlyWarns() {
     var e = started()
-    _ = e.handle(.frame({ var f = FrameSummary.empty; f.timestamp = 2.0; return f }()))  // absent
+    leave(&e)  // absent
     let warn = e.handle(.hardware(.lidSensorLost))
     #expect(e.state == .guarding(.absent))
     #expect(warn.contains(.notify(.sensorFallback("kapak"))))
@@ -130,7 +139,7 @@ private func contains(_ effects: [GuardEffect], lock reason: LockReason) -> Bool
 @Test func lidTriggersOnlyWhenAbsentAndBaselineRefreshedWhenPresent() {
     var e = started()
     _ = e.handle(.lidAngle(100))                // present: taban 100
-    _ = e.handle(.frame({ var f = FrameSummary.empty; f.timestamp = 2.0; return f }()))  // absent
+    leave(&e)  // absent
     #expect(e.handle(.lidAngle(104)).isEmpty)   // ilk sapma
     let fx = e.handle(.lidAngle(104))           // ikinci → tetik
     #expect(contains(fx, lock: .lidAngle))
@@ -141,7 +150,7 @@ private func contains(_ effects: [GuardEffect], lock reason: LockReason) -> Bool
 @Test func faceUnlockClosesGuardByDefault() {
     var e = started()
     _ = e.handle(.input)                        // present: no-op
-    _ = e.handle(.frame({ var f = FrameSummary.empty; f.timestamp = 2.0; return f }()))  // absent
+    leave(&e)  // absent
     _ = e.handle(.input)                        // → locked(.input)
     let fx = e.handle(.frame(ownerFrame(at: 3.0)))
     #expect(e.state == .off)                    // closeGuard varsayılan
@@ -151,7 +160,7 @@ private func contains(_ effects: [GuardEffect], lock reason: LockReason) -> Bool
 @Test func faceUnlockKeepsGuardingWhenConfigured() {
     var s = GuardSettings(); s.returnBehavior = .keepGuarding
     var e = started(settings: s)
-    _ = e.handle(.frame({ var f = FrameSummary.empty; f.timestamp = 2.0; return f }()))
+    leave(&e)
     _ = e.handle(.input)                        // locked
     _ = e.handle(.frame(ownerFrame(at: 3.0)))
     #expect(e.state == .guarding(.present))
@@ -159,7 +168,7 @@ private func contains(_ effects: [GuardEffect], lock reason: LockReason) -> Bool
 
 @Test func passcodeUnlocksAndWrongPasscodeIsLogged() {
     var e = started(verify: { $0 == "dogru" })
-    _ = e.handle(.frame({ var f = FrameSummary.empty; f.timestamp = 2.0; return f }()))
+    leave(&e)
     _ = e.handle(.input)                        // locked
     let wrong = e.handle(.passcode("yanlis"))
     #expect(wrong.contains(.logEvent(.wrongPasscode)))
@@ -197,7 +206,7 @@ private func contains(_ effects: [GuardEffect], lock reason: LockReason) -> Bool
 
 @Test func stopGuardWhileLockedIsIgnored() {
     var e = started()
-    _ = e.handle(.frame({ var f = FrameSummary.empty; f.timestamp = 2.0; return f }()))
+    leave(&e)
     _ = e.handle(.input)                        // locked
     _ = e.handle(.command(.stopGuard))
     if case .locked = e.state {} else { Issue.record("kilitliyken durdurulamamalı") }
