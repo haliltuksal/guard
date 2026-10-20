@@ -26,8 +26,9 @@ public struct HotKeySpec: Codable, Equatable, Sendable {
         self.keyCode = keyCode
         self.carbonModifiers = carbonModifiers
     }
-    /// ⌃⌥⌘L — keyCode 37 ('l'), control+option+command.
-    public static let `default` = HotKeySpec(keyCode: 37, carbonModifiers: 0x1 | 0x4 | 0x8)
+    /// ⌃⌥⌘L — keyCode 37 ('l'); Carbon RegisterEventHotKey maskeleri
+    /// controlKey(0x1000) | optionKey(0x800) | cmdKey(0x100) = 0x1900.
+    public static let `default` = HotKeySpec(keyCode: 37, carbonModifiers: 0x1900)
 }
 
 /// Kullanıcı tercihleri. İmzalı dosyada saklanır (spec §9.1); varsayılanlar spec §8.5.
