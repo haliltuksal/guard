@@ -3,7 +3,7 @@ import Foundation
 /// Sahip varlığını ardışık kare oylarıyla doğrular ve histerezisle sürdürür:
 /// 3 ardışık "owner" karesi izi doğrular; iz kopmadıkça ve son sahip gözleminden
 /// 1,5 sn geçmedikçe "present" kalır.
-public struct OwnerPresence {
+public struct OwnerPresence: Sendable {
     public static let absenceTimeout: TimeInterval = 1.5
     private static let framesToVerify = 3
 

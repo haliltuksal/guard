@@ -32,7 +32,8 @@ public struct PipelineConfig: Sendable {
 
 /// Kareden `FrameSummary` üretir. Çekirdek yalnızca bu özeti görür. Ağ yok;
 /// yabancı vektörleri saklanmaz. Çalışma anı doğruluğu cihazda ölçülür (D13/D14).
-public final class VisionPipeline {
+/// `@unchecked Sendable`: `process` yalnızca tek seri kamera kuyruğundan çağrılır.
+public final class VisionPipeline: @unchecked Sendable {
     private let detector: FaceDetector
     private let embedder: FaceEmbedder
     private let matcher: FaceMatcher

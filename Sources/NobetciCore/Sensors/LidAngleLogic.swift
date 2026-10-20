@@ -3,7 +3,7 @@ import Foundation
 /// Kapak açısı değişimi tetikleyicisi (T4). Taban açısından sapma eşiği aşılıp
 /// iki ardışık örnekte sürerse tetikler (tek örnek gürültüsünü eler).
 /// Eşik derece değerleri on-device ölçümle (D1) kesinleşir; buradakiler başlangıç.
-public struct LidAngleLogic {
+public struct LidAngleLogic: Sendable {
     private let threshold: Double
     private var baseline: Double?
     private var consecutiveBeyond = 0

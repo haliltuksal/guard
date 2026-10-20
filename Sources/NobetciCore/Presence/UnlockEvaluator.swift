@@ -16,7 +16,7 @@ public enum UnlockDecision: Equatable, Sendable {
 
 /// Yüzle kilit açma kararı (spec §5.4). Dört koşul birlikte sağlanmalı; sıkı modda
 /// ayrıca rastgele bir baş hareketi istenir.
-public struct UnlockEvaluator {
+public struct UnlockEvaluator: Sendable {
     public static let framesRequired = 5
     public static let blinkWindow: TimeInterval = 3.0
 

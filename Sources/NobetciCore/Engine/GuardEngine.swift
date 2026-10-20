@@ -3,9 +3,9 @@ import Foundation
 /// Koruma durum makinesi (spec §5). Olayları sırayla işler, durumu ilerletir ve
 /// yan etki listesi döndürür. Donanıma dokunmaz; ManualClock ile tam deterministik.
 /// Kararların hepsi burada; fail-closed: emin olunamayan her durum → Kilitli.
-public struct GuardEngine {
+public struct GuardEngine: Sendable {
     private let clock: Clock
-    private let verifyPasscode: (String) -> Bool
+    private let verifyPasscode: @Sendable (String) -> Bool
 
     public private(set) var settings: GuardSettings
     public private(set) var state: GuardState = .off
@@ -22,7 +22,7 @@ public struct GuardEngine {
 
     public init(clock: Clock,
                 settings: GuardSettings = GuardSettings(),
-                verifyPasscode: @escaping (String) -> Bool = { _ in false }) {
+                verifyPasscode: @escaping @Sendable (String) -> Bool = { _ in false }) {
         self.clock = clock
         self.settings = settings
         self.verifyPasscode = verifyPasscode

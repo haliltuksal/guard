@@ -3,7 +3,7 @@ import Security
 
 /// Keychain sarmalayıcısı: şifreleme anahtarları, şifre özeti ve deneme sayacı.
 /// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` — cihaza bağlı, iCloud'a gitmez.
-public struct KeychainStore {
+public struct KeychainStore: Sendable {
     private let service: String
     public init(service: String = "com.halil.nobetci") { self.service = service }
 

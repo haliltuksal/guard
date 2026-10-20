@@ -10,3 +10,51 @@
 "shield.blink" = "Merhaba %@, göz kırp";
 "shield.bystander" = "Yanında biri var — şifre gerekli";
 "shield.retry" = "%d sn sonra tekrar dene";
+
+/* Menü durumları */
+"menu.status.ready" = "Hazır";
+"menu.status.guarding" = "Nöbette · %@";
+"menu.status.preparing" = "Hazırlanıyor…";
+"menu.sensor.camera" = "Kamera";
+"menu.sensor.lid" = "Kapak";
+"menu.sensor.accel" = "Hareket";
+"menu.sensor.wake" = "Uyanık";
+"menu.settings.open" = "Ayarlar…";
+"menu.fixproblem" = "Sorunu gider";
+
+/* Bildirimler */
+"notify.guardStarted" = "Nöbetçi devrede";
+"notify.guardEndedNoEvents" = "Nöbet bitti — olay yok";
+"notify.prepareFailed" = "Nöbet başlatılamadı";
+"notify.sensorFallback" = "%@ sensörü yok — yedek kullanılıyor";
+"notify.returned" = "Tekrar hoş geldin";
+
+/* Ön kontrol */
+"preflight.accessibility" = "Erişilebilirlik izni gerekli";
+"preflight.enrollment" = "Önce yüz kaydı ve şifre gerekli";
+
+/* Kalkan baş hareketi */
+"shield.turn.left" = "Sola bak";
+"shield.turn.right" = "Sağa bak";
+"shield.turn.up" = "Yukarı bak";
+
+/* Kurulum */
+"setup.title" = "Nöbetçi Kurulumu";
+"setup.intro.body" = "Nöbetçi sen yokken Mac'ini korur. Hiçbir veri cihazından çıkmaz.";
+"setup.next" = "Devam";
+"setup.permissions" = "İzinler";
+"setup.enroll" = "Yüz Kaydı";
+"setup.passcode" = "Şifre";
+"setup.done" = "Hazır";
+"setup.finish" = "Bitir";
+
+/* Ayarlar */
+"settings.general" = "Genel";
+"settings.detection" = "Algılama";
+"settings.unlock" = "Kilit açma";
+"settings.history" = "Geçmiş";
+"settings.about" = "Hakkında";
+
+/* Rapor */
+"report.title" = "Sen Yokken Olanlar";
+"report.close" = "Kapat";

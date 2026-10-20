@@ -5,7 +5,7 @@ import Foundation
 // Yardımcılar ------------------------------------------------------------
 
 private func started(settings: GuardSettings = GuardSettings(),
-                     verify: @escaping (String) -> Bool = { _ in false }) -> GuardEngine {
+                     verify: @escaping @Sendable (String) -> Bool = { _ in false }) -> GuardEngine {
     var e = GuardEngine(clock: ManualClock(), settings: settings, verifyPasscode: verify)
     _ = e.handle(.command(.startGuard))
     _ = e.handle(.prepareResult(ok: true, missing: []))   // → guarding(.present)

@@ -2,7 +2,7 @@ import Foundation
 
 /// Kamera sağlığı/sahne tetikleyicileri (T6 örtülü/karanlık, T7 donma, T8 kayma).
 /// Eşikler on-device kliplerle (D6/D1) kesinleşir; buradakiler başlangıç.
-public struct SceneHealthLogic {
+public struct SceneHealthLogic: Sendable {
     public static let minBrightness: Double = 0.08  // ortalama parlaklık (0–1)
     public static let minTexture: Double = 0.02     // Laplacian varyansı tabanı
     public static let freezeGap: TimeInterval = 1.0 // kare gelmeme süresi
