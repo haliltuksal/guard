@@ -5,15 +5,18 @@ import Foundation
 public struct SceneHealthLogic: Sendable {
     public static let minBrightness: Double = 0.08  // ortalama parlaklık (0–1)
     public static let minTexture: Double = 0.02     // Laplacian varyansı tabanı
+    public static let dimForTextureCollapse: Double = 0.3  // doku çöküşü ancak loşken "örtülü" sayılır
     public static let freezeGap: TimeInterval = 1.0 // kare gelmeme süresi
     public static let shiftFraction: Double = 0.03  // kare genişliğinin oranı
 
     private let cameraShiftEnabled: Bool
     public init(cameraShiftEnabled: Bool) { self.cameraShiftEnabled = cameraShiftEnabled }
 
-    /// Kamera örtüldü/karartıldı: ortalama parlaklık ya da doku çöktü.
+    /// Kamera örtüldü/karartıldı: karanlık, ya da loş + dokusuz (parmak/bez). Parlak ve
+    /// dokusuz bir sahne (düz duvar) örtülü sayılmaz — yoksa sahip yokken sürekli yanlış alarm.
     public func isCovered(brightness: Double, texture: Double) -> Bool {
-        brightness < Self.minBrightness || texture < Self.minTexture
+        brightness < Self.minBrightness
+            || (texture < Self.minTexture && brightness < Self.dimForTextureCollapse)
     }
 
     /// Kare akışı kesildi/dondu.

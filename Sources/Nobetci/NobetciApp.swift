@@ -11,6 +11,7 @@ struct NobetciApp: App {
                 .onAppear { model.presentSetupIfNeeded() }
         } label: {
             Image(systemName: menuIcon)
+                .task { model.presentSetupIfNeeded() }   // ilk kurulum AÇILIŞTA gelsin, menüye tıklamayı beklemesin
         }
         .menuBarExtraStyle(.window)
 

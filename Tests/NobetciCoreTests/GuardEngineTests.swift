@@ -110,6 +110,23 @@ private func contains(_ effects: [GuardEffect], lock reason: LockReason) -> Bool
     #expect(contains(fx, lock: .cameraLost))
 }
 
+@Test func coveredCameraWhilePresentDecaysPresenceThenLocks() {
+    // Kamera örtülüyken sahip görülemez: kısa örtme tolere edilir, 1,5 sn sonra varlık
+    // düşer (ilk girdi kilitler), bir sonraki örtülü kare T6 ile kilitler (fail-closed).
+    let clock = ManualClock()
+    var e = GuardEngine(clock: clock)
+    _ = e.handle(.command(.startGuard))
+    _ = e.handle(.prepareResult(ok: true, missing: []))
+    #expect(e.handle(.cameraHealth(.covered)).isEmpty)          // kısa örtme → hiçbir şey
+    #expect(e.state == .guarding(.present))
+    clock.advance(by: 2.0)
+    let fx = e.handle(.cameraHealth(.covered))                   // 1,5 sn geçti → absent
+    #expect(e.state == .guarding(.absent))
+    #expect(fx.contains(.setInputPolicy(.lockOnFirstInput)))
+    let lockFx = e.handle(.cameraHealth(.covered))               // absent + örtülü → T6
+    #expect(lockFx.contains(.logEvent(.triggered(.cameraCovered))))
+}
+
 @Test func lidTriggersOnlyWhenAbsentAndBaselineRefreshedWhenPresent() {
     var e = started()
     _ = e.handle(.lidAngle(100))                // present: taban 100

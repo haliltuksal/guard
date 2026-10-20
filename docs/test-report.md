@@ -69,3 +69,19 @@ Her satır çalıştırıldığında ölçümüyle buraya yazılacak.
 - Derinlik sensörü yok: kararlı bir fotoğraf/video saldırısı varsayılan modda teorik
   olarak mümkün; sıkı mod zorlaştırır. Bu bir gizlilik kalkanıdır.
 - Model ağırlıkları ticari olmayan lisanslı (hedef kitle B — ücretsiz paylaşım için uygun).
+
+## 5. İkinci inceleme (2026-10-21, taze gözle) — bulundu ve düzeltildi
+
+| # | Bulgu | Etki | Düzeltme |
+|---|---|---|---|
+| R1 | **Karışık zaman tabanı**: kamera PTS (mach_absolute) motor saatiyle (mach_continuous) karışıyordu → uyumuş Mac'te sahip saatlerce "var" (fail-open) | Kritik | Kareler motor saatiyle damgalanır (`AppModel` onFrame) |
+| R2 | Kamera örtülüyken varlık düşmüyordu (özet yok, `.covered` present'ta yutuluyor) → örtüp uzaklaş = kilitsiz | Önemli | `handleCamera(.present,.covered)` varlığı 1,5 sn'de düşürür → T6 (test: `coveredCameraWhilePresentDecaysPresenceThenLocks`) |
+| R3 | Watchdog kamera ısınmasında (0,5–2 s) sahte `cameraLost` kilidi | Önemli | İlk kare görülmeden "durdu" denmez; 10 s başlangıç toleransı |
+| R4 | Parlak düz duvar "örtülü" sayılıyordu (`texture<0.02` tek başına) → sürekli T6 | Önemli | Doku çöküşü yalnızca loşken (`brightness<0.3`) örtülü sayılır (test güncellendi) |
+| R5 | Yüz kaydı bitişinde `stopRunning` delegate kuyruğundan → deadlock riski | Önemli | Ana kuyruğa atılır |
+| R6 | Ayar değişimi yeni motorda `bootSession=""` → çökme-kurtarma (T13) bozuluyordu | Önemli | Yeniden tohumlanır |
+| R7 | Girdi filtresi kurulamazsa sessizce "nöbette" (fail-open) | Önemli | Hata → T14 kilit |
+| R8 | Oturumlar yalnızca elle durdurunca kaydediliyordu | Orta | `stopSensors`'ta her bitişte yazılır; relaunch oturumu da tutulur |
+| R9–R11 | Kamera ✓ hiç yanmıyordu; pipeline/kamera nöbetler arası sızıyordu; kurulum açılışta değil menüye tıklayınca geliyordu | Küçük | Düzeltildi |
+
+79 test yeşil. Doğru olduğu yeniden izlenen: durum geçişleri, T1 debounce, histerezis, monoton bekleme, kripto, girdi sızmazlığı, hizalama, seri olay kanalı.

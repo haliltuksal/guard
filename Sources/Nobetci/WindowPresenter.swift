@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 final class WindowPresenter {
     private var window: NSWindow?
+    var isShowing: Bool { window != nil }
 
     func show<Content: View>(title: String, size: NSSize, @ViewBuilder content: () -> Content) {
         let hosting = NSHostingController(rootView: content())
@@ -18,6 +19,10 @@ final class WindowPresenter {
         NSApp.activate(ignoringOtherApps: true)
         w.makeKeyAndOrderFront(nil)
         window = w
+        // Kullanıcı kırmızı düğmeyle kapatırsa referansı bırak ki isShowing doğru kalsın.
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.window = nil }
+        }
     }
 
     func close() {

@@ -30,10 +30,11 @@ import Testing
 
 // MARK: SceneHealthLogic (T6, T7, T8)
 
-@Test func sceneCoveredByDarknessOrNoTexture() {
+@Test func sceneCoveredByDarknessOrDimTextureCollapse() {
     let s = SceneHealthLogic(cameraShiftEnabled: true)
-    #expect(s.isCovered(brightness: 0.02, texture: 0.5))   // karanlık
-    #expect(s.isCovered(brightness: 0.5, texture: 0.001))  // dokusuz (örtülü)
+    #expect(s.isCovered(brightness: 0.02, texture: 0.5))    // karanlık → örtülü
+    #expect(s.isCovered(brightness: 0.2, texture: 0.001))   // loş + dokusuz (parmak/bez) → örtülü
+    #expect(!s.isCovered(brightness: 0.5, texture: 0.001))  // parlak düz duvar → ÖRTÜLÜ DEĞİL (yanlış alarm değil)
     #expect(!s.isCovered(brightness: 0.5, texture: 0.5))
 }
 

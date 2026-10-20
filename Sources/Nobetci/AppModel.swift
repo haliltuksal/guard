@@ -181,8 +181,9 @@ final class AppModel {
         lidSensor.start(); sensorStatus.lid = lidSensor.isAvailable
         accelerometer.start(); sensorStatus.accelerometer = accelerometer.isAvailable
         hardware.start()
-        try? inputFilter.install()
-        sensorStatus.camera = camera != nil
+        do { try inputFilter.install() } catch {
+            send(.hardware(.filterUnhealthy))   // filtre kurulamadı → fail-closed (T14), sessizce "nöbette" kalma
+        }
         if !lidSensor.isAvailable { send(.hardware(.lidSensorLost)) }
         startWatchdog()
     }
@@ -190,17 +191,21 @@ final class AppModel {
     private func stopSensors() {
         watchdog?.invalidate(); watchdog = nil
         camera?.stop(); lidSensor.stop(); accelerometer.stop(); hardware.stop(); inputFilter.uninstall()
+        camera = nil; pipeline = nil        // her nöbet temiz başlar (eski iz/kırpma durumu taşınmaz)
         sensorStatus = SensorStatus()
+        flushSession()                      // nöbet nasıl bitse bitsin (yüz/dönüş/durdur) kayıt yazılır
     }
 
     /// Kamera karesi akışı sessizce durursa (kesinti bildirimi gelmese bile) kilitler (T7).
     private func startWatchdog() {
-        frameClock.mark()
+        frameClock.reset()
         watchdog?.invalidate()
         watchdog = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self, case .guarding = self.state else { return }
-                if self.frameClock.secondsSince > 1.0 { self.send(.cameraHealth(.lost)) }
+                // Kamera ısınması normaldir (0,5–2 s; ilk açılışta model derleme). Yalnızca akış
+                // BAŞLADIKTAN sonra durursa (>1 s) ya da hiç başlamazsa (>10 s) kilitle.
+                if self.frameClock.isStalled(gap: 1.0, startupGrace: 10.0) { self.send(.cameraHealth(.lost)) }
             }
         }
     }
@@ -222,9 +227,8 @@ final class AppModel {
     // MARK: Kayıt ve kalıcılık
 
     private func appendLog(_ kind: GuardLogKind) {
-        if case .guardStarted = kind { currentSession = SessionRecord(started: Date()) }
+        if currentSession == nil { currentSession = SessionRecord(started: Date()) }   // relaunch oturumları dahil
         currentSession?.events.append(GuardEventRecord(at: Date(), kind: kind))
-        if case .guardEnded = kind { flushSession() }
     }
 
     private func flushSession() {
@@ -261,7 +265,7 @@ final class AppModel {
     // MARK: Pencereler ve kurulum
 
     func presentSetupIfNeeded() {
-        guard needsSetup else { return }
+        guard needsSetup, !setupPresenter.isShowing else { return }   // açılış + menü tıklaması çifte pencere açmasın
         setupPresenter.show(title: L10n.t("setup.title"), size: NSSize(width: 480, height: 420)) {
             SetupView(model: self) { [weak self] in self?.setupPresenter.close() }
         }
@@ -307,7 +311,11 @@ final class AppModel {
         try? fileStore.writeSettings(newSettings)
         try? hotKey.register(newSettings.hotKey)
         pipeline = nil   // bir sonraki nöbette yeni ayarla kurulur
-        if case .off = state { rebuildCoordinator() }
+        if case .off = state {
+            rebuildCoordinator()
+            // Yeni motor bootSession'ı bilmez; yeniden tohumla, yoksa çökme sonrası kilitli açılış (T13) bozulur.
+            send(.launched(bootSession: BootSession.current(), previous: nil))
+        }
     }
 
     func isEnrolled() -> Bool {
@@ -329,8 +337,11 @@ final class AppModel {
             let builtPipeline = VisionPipeline(detector: FaceDetector(), embedder: embedder, config: config)
             self.pipeline = builtPipeline
             self.camera = CameraSource(
-                onFrame: { [weak self] buffer, ts in
-                    let output = builtPipeline.process(buffer, now: ts)
+                onFrame: { [weak self] buffer, _ in
+                    // TEK zaman tabanı: motorun saati (mach_continuous). Kamera PTS'i KULLANILMAZ —
+                    // o mach_absolute tabanlıdır (uykuda durur); motorun varlık tohumuyla
+                    // karışırsa uyumuş bir Mac'te sahip saatlerce "var" sayılır (fail-open).
+                    let output = builtPipeline.process(buffer, now: SystemClock().now())
                     guard let self else { return }
                     self.markFrameArrived()
                     if let summary = output.summary { self.sendFromAnywhere(.frame(summary)) }
@@ -339,6 +350,7 @@ final class AppModel {
                 onInterruption: { [weak self] in self?.sendFromAnywhere(.cameraHealth(.lost)) })
             try? self.camera?.configure()
             self.camera?.start()
+            self.sensorStatus.camera = true
         }
     }
 
@@ -373,9 +385,17 @@ private struct PasscodeRecord: Codable {
 }
 
 /// Kamera karesi varış zamanını iş parçacığı-güvenli tutar (kamera bg yazar, watchdog ana okur).
+/// İlk kare gelmeden "durdu" demez: ısınma için ayrı, daha uzun bir başlangıç toleransı vardır.
 final class LastFrameClock: @unchecked Sendable {
     private let lock = NSLock()
-    private var last = Date()
+    private var started = Date()
+    private var last: Date?
+    func reset() { lock.withLock { started = Date(); last = nil } }
     func mark() { lock.withLock { last = Date() } }
-    var secondsSince: TimeInterval { lock.withLock { Date().timeIntervalSince(last) } }
+    func isStalled(gap: TimeInterval, startupGrace: TimeInterval) -> Bool {
+        lock.withLock {
+            if let last { return Date().timeIntervalSince(last) > gap }
+            return Date().timeIntervalSince(started) > startupGrace
+        }
+    }
 }

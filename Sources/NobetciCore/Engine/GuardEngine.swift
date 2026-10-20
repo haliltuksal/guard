@@ -136,6 +136,15 @@ public struct GuardEngine: Sendable {
         switch (state, h) {
         case (.guarding, .lost):
             return lock(.cameraLost, now: clock.now())               // her alt durumda (kör kaldık)
+        case (.guarding(.present), .covered):
+            // Örtülü kamera sahibi göremez; kare gelmediği için varlık zaman aşımı ancak
+            // burada ilerletilebilir. Kısa örtme tolere edilir; 1,5 sn sonra "yok" →
+            // ilk girdi kilitler, sonraki örtülü kare T6 ile kilitler (fail-closed).
+            if ownerPresence.update(match: .uncertain, trackAlive: false, now: clock.now()) == .absent {
+                state = .guarding(.absent)
+                return [.setInputPolicy(.lockOnFirstInput), log(.ownerLeft)]
+            }
+            return []
         case (.guarding(.absent), .covered):
             return lock(.cameraCovered, now: clock.now())
         case (.guarding(.absent), .shifted):

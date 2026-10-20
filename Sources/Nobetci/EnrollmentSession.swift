@@ -61,6 +61,10 @@ final class EnrollmentSession: @unchecked Sendable {
         lock.unlock()
 
         onProgress(count, target)
-        if complete { stop(); onComplete(snapshot) }
+        if complete {
+            // stopRunning() kamera delegate kuyruğundan çağrılırsa deadlock riski: ana kuyruğa at.
+            DispatchQueue.main.async { [self] in self.stop() }
+            onComplete(snapshot)
+        }
     }
 }
