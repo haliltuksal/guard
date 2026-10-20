@@ -49,6 +49,12 @@ final class AppModel {
     private var passcodeBuffer = ""
     private var currentSession: SessionRecord?
 
+    // Seri olay kanalı: tüm kaynaklardan gelen olaylar FIFO sırayla motora ulaşır.
+    private let events: AsyncStream<GuardEvent>
+    private let eventSink: AsyncStream<GuardEvent>.Continuation
+    private let frameClock = LastFrameClock()
+    private var watchdog: Timer?
+
     // MARK: Kurulum
 
     init() {
@@ -56,10 +62,26 @@ final class AppModel {
         fileStore = SecureFileStore(directory: SecureFileStore.defaultDirectory(),
                                     dataKey: keys.data, settingsKey: keys.settings)
         settings = fileStore.readSettings()
+        (events, eventSink) = AsyncStream<GuardEvent>.makeStream()
         needsSetup = !isEnrolled()
         configureAdapters()
         rebuildCoordinator()
+        startEventLoop()
         bootRecovery()
+    }
+
+    /// Olayları tek tek, geldikleri sırayla işler (sıra garantisi — başlat/hazırla
+    /// yarışı ve şifre karakter karışması olmaz).
+    private func startEventLoop() {
+        Task { @MainActor in
+            for await event in events {
+                let effects = await coordinator.handle(event)
+                apply(effects)
+                let newState = await coordinator.state
+                state = newState
+                if case .locked = newState { pipeline?.setLocked(true) } else { pipeline?.setLocked(false) }
+            }
+        }
     }
 
     private func configureAdapters() {
@@ -100,16 +122,10 @@ final class AppModel {
 
     // MARK: Olay döngüsü
 
-    /// Herhangi bir iş parçacığından gelen geri çağırımları koordinatöre taşır.
-    private nonisolated func sendFromAnywhere(_ event: GuardEvent) {
-        Task { [weak self] in
-            guard let self else { return }
-            let effects = await self.coordinator.handle(event)
-            await MainActor.run { self.apply(effects) }
-        }
-    }
+    /// Herhangi bir iş parçacığından olayı seri kanala koyar (sıra korunur).
+    private nonisolated func sendFromAnywhere(_ event: GuardEvent) { eventSink.yield(event) }
 
-    private func send(_ event: GuardEvent) { sendFromAnywhere(event) }
+    private func send(_ event: GuardEvent) { eventSink.yield(event) }
 
     // MARK: Kullanıcı komutları
 
@@ -139,14 +155,16 @@ final class AppModel {
 
     private func apply(_ effects: [GuardEffect]) {
         for effect in effects { apply(effect) }
-        Task { state = await coordinator.state }
     }
 
     private func apply(_ effect: GuardEffect) {
         switch effect {
         case .startSensors: startSensors()
         case .stopSensors: stopSensors()
-        case .showShield(let m): shieldMessage = m; passcodeCount = 0; shield.show()
+        case .showShield(let m):
+            shieldMessage = m
+            if case .gesture(let t) = m { pipeline?.setRequestedTurn(t) } else { pipeline?.setRequestedTurn(nil) }
+            shield.show()
         case .hideShield: shield.hide(animated: true); passcodeBuffer = ""; passcodeCount = 0
         case .setInputPolicy(let p): inputFilter.setPolicy(Self.map(p))
         case .wakeKeep(let on): if on { try? wakeKeeper.start() } else { wakeKeeper.stop() }; sensorStatus.wakeKeep = on
@@ -166,12 +184,28 @@ final class AppModel {
         try? inputFilter.install()
         sensorStatus.camera = camera != nil
         if !lidSensor.isAvailable { send(.hardware(.lidSensorLost)) }
+        startWatchdog()
     }
 
     private func stopSensors() {
+        watchdog?.invalidate(); watchdog = nil
         camera?.stop(); lidSensor.stop(); accelerometer.stop(); hardware.stop(); inputFilter.uninstall()
         sensorStatus = SensorStatus()
     }
+
+    /// Kamera karesi akışı sessizce durursa (kesinti bildirimi gelmese bile) kilitler (T7).
+    private func startWatchdog() {
+        frameClock.mark()
+        watchdog?.invalidate()
+        watchdog = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, case .guarding = self.state else { return }
+                if self.frameClock.secondsSince > 1.0 { self.send(.cameraHealth(.lost)) }
+            }
+        }
+    }
+
+    nonisolated func markFrameArrived() { frameClock.mark() }
 
     // MARK: Şifre
 
@@ -290,12 +324,17 @@ final class AppModel {
             let config = PipelineConfig(profile: profile,
                                         thresholds: Thresholds(accept: 0.70, sustain: 0.55, reject: 0.40),
                                         minFaceHeight: PipelineConfig.minFaceHeight(for: settings.distance),
-                                        minBodyHeight: 0.25, strictMode: settings.strictMode)
+                                        minBodyHeight: 0.25, strictMode: settings.strictMode,
+                                        cameraShiftEnabled: settings.cameraShiftDetection)
             let builtPipeline = VisionPipeline(detector: FaceDetector(), embedder: embedder, config: config)
             self.pipeline = builtPipeline
             self.camera = CameraSource(
                 onFrame: { [weak self] buffer, ts in
-                    self?.sendFromAnywhere(.frame(builtPipeline.process(buffer, now: ts)))
+                    let output = builtPipeline.process(buffer, now: ts)
+                    guard let self else { return }
+                    self.markFrameArrived()
+                    if let summary = output.summary { self.sendFromAnywhere(.frame(summary)) }
+                    if let health = output.cameraHealth { self.sendFromAnywhere(.cameraHealth(health)) }
                 },
                 onInterruption: { [weak self] in self?.sendFromAnywhere(.cameraHealth(.lost)) })
             try? self.camera?.configure()
@@ -331,4 +370,12 @@ private struct PasscodeRecord: Codable {
     var salt: Data
     var rounds: Int
     var hash: Data
+}
+
+/// Kamera karesi varış zamanını iş parçacığı-güvenli tutar (kamera bg yazar, watchdog ana okur).
+final class LastFrameClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last = Date()
+    func mark() { lock.withLock { last = Date() } }
+    var secondsSince: TimeInterval { lock.withLock { Date().timeIntervalSince(last) } }
 }

@@ -22,9 +22,12 @@ import Testing
     #expect(!p.hasVerifiedTrack)
 }
 
-@Test func brokenTrackDropsVerification() {
+@Test func brokenTrackStaysPresentUntilTimeout() {
+    // Tek bir kaçırılan karede (iz koptu) sahip anında "yok" sayılmamalı; 1,5 sn
+    // zaman aşımı tek de-doğrulama yolu olmalı (yoksa karşıdaki sahip yanlışlıkla kilitlenir).
     var p = OwnerPresence()
     for t in [0.0, 0.1, 0.2] { _ = p.update(match: .owner, trackAlive: true, now: t) }
-    #expect(p.update(match: .owner, trackAlive: false, now: 0.3) == .absent) // iz koptu
+    #expect(p.update(match: .owner, trackAlive: false, now: 0.4) == .present) // kısa kayıp → hâlâ present
+    #expect(p.update(match: .uncertain, trackAlive: false, now: 2.0) == .absent) // 1,5 sn sonra → absent
     #expect(!p.hasVerifiedTrack)
 }

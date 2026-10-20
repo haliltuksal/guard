@@ -10,7 +10,8 @@ import ApplicationServices
 /// Kararlar saf `InputPolicyEngine`'e devredilir. Filtre ayrı bir iş parçacığında ve
 /// kendi run loop'unda çalışır; macOS tap'i devre dışı bırakırsa anında yeniden açar.
 public final class InputFilter: @unchecked Sendable {
-    private let lock = NSLock()
+    private let lock = NSLock()           // engine + policy
+    private let stateLock = NSLock()      // tap/health durumu (tap thread + health kuyruğu + main)
     private var engine: InputPolicyEngine
     private var currentPolicy: InputPolicy = .passThrough
 
@@ -20,7 +21,8 @@ public final class InputFilter: @unchecked Sendable {
     private var runLoop: CFRunLoop?
     private var healthTimer: DispatchSourceTimer?
     private var reenableFailures = 0
-    public private(set) var isHealthy = false
+    private var _isHealthy = false
+    public var isHealthy: Bool { stateLock.withLock { _isHealthy } }
 
     private let onLockRequested: @Sendable () -> Void
     private let onPasscode: @Sendable (InputDecision) -> Void
@@ -46,51 +48,55 @@ public final class InputFilter: @unchecked Sendable {
     public func setPolicy(_ newPolicy: InputPolicy) { lock.withLock { currentPolicy = newPolicy } }
 
     public func install() throws {
-        guard taps.isEmpty else { return }
+        guard stateLock.withLock({ taps.isEmpty }) else { return }
         guard Self.hasAccessibilityPermission(prompt: false) else { throw InputFilterError.accessibilityDenied }
 
         let mask: CGEventMask = ~0   // tüm olay türleri
         let refcon = Unmanaged.passUnretained(self).toOpaque()
+        var created: [CFMachPort] = []
         for location in [CGEventTapLocation.cghidEventTap, .cgSessionEventTap] {
             guard let tap = CGEvent.tapCreate(tap: location, place: .headInsertEventTap, options: .defaultTap,
                                               eventsOfInterest: mask, callback: Self.callback, userInfo: refcon) else {
-                uninstall()
+                created.forEach { CGEvent.tapEnable(tap: $0, enable: false) }
                 throw InputFilterError.tapCreationFailed
             }
-            taps.append(tap)
+            created.append(tap)
         }
+        stateLock.withLock { taps = created }
 
         let started = Thread { [weak self] in
             guard let self else { return }
-            self.runLoop = CFRunLoopGetCurrent()
-            for tap in self.taps {
+            let taps = self.stateLock.withLock { self.taps }
+            var sources: [CFRunLoopSource] = []
+            for tap in taps {
                 guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else { continue }
                 CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
                 CGEvent.tapEnable(tap: tap, enable: true)
-                self.sources.append(source)
+                sources.append(source)
             }
+            self.stateLock.withLock { self.sources = sources; self.runLoop = CFRunLoopGetCurrent() }
             CFRunLoopRun()
         }
         started.name = "com.halil.nobetci.inputfilter"
-        thread = started
+        stateLock.withLock { thread = started; _isHealthy = true; reenableFailures = 0 }
         started.start()
-
-        isHealthy = true
         startHealthTimer()
     }
 
     public func uninstall() {
         healthTimer?.cancel(); healthTimer = nil
+        let (taps, sources, runLoop) = stateLock.withLock { (self.taps, self.sources, self.runLoop) }
         if let runLoop {
-            CFRunLoopPerformBlock(runLoop, CFRunLoopMode.commonModes.rawValue) { [self] in
+            CFRunLoopPerformBlock(runLoop, CFRunLoopMode.commonModes.rawValue) {
                 for source in sources { CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes) }
                 CFRunLoopStop(CFRunLoopGetCurrent())
             }
             CFRunLoopWakeUp(runLoop)
         }
         for tap in taps { CGEvent.tapEnable(tap: tap, enable: false) }
-        taps.removeAll(); sources.removeAll(); runLoop = nil; thread = nil
-        isHealthy = false
+        stateLock.withLock {
+            self.taps.removeAll(); self.sources.removeAll(); self.runLoop = nil; self.thread = nil; _isHealthy = false
+        }
     }
 
     // MARK: Olay işleme (tap iş parçacığında)
@@ -120,12 +126,13 @@ public final class InputFilter: @unchecked Sendable {
     }
 
     private func reenableAll() {
+        let taps = stateLock.withLock { self.taps }
         var ok = true
         for tap in taps {
             CGEvent.tapEnable(tap: tap, enable: true)
             if !CGEvent.tapIsEnabled(tap: tap) { ok = false }
         }
-        if ok { reenableFailures = 0 } else { reportUnhealthy() }
+        if ok { stateLock.withLock { reenableFailures = 0 } } else { reportUnhealthy() }
     }
 
     private func startHealthTimer() {
@@ -137,19 +144,21 @@ public final class InputFilter: @unchecked Sendable {
     }
 
     private func checkHealth() {
+        let taps = stateLock.withLock { self.taps }
         let allEnabled = !taps.isEmpty && taps.allSatisfy { CGEvent.tapIsEnabled(tap: $0) }
-        if allEnabled { reenableFailures = 0; return }
+        if allEnabled { stateLock.withLock { reenableFailures = 0 }; return }
         reenableAll()
-        let stillBad = taps.contains { !CGEvent.tapIsEnabled(tap: $0) }
-        if stillBad { reportUnhealthy() }
+        if taps.contains(where: { !CGEvent.tapIsEnabled(tap: $0) }) { reportUnhealthy() }
     }
 
     private func reportUnhealthy() {
-        reenableFailures += 1
-        if reenableFailures >= 3, isHealthy {
-            isHealthy = false
-            onHealthChange(false)   // çekirdek bunu T14 sayar
+        let fire = stateLock.withLock { () -> Bool in
+            reenableFailures += 1
+            guard reenableFailures >= 3, _isHealthy else { return false }
+            _isHealthy = false
+            return true
         }
+        if fire { onHealthChange(false) }   // çekirdek bunu T14 sayar
     }
 
     // CGEventTap C geri çağırımı; self refcon üzerinden geri alınır.

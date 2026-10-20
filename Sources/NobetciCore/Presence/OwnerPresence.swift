@@ -23,19 +23,15 @@ public struct OwnerPresence: Sendable {
     }
 
     public mutating func update(match: MatchResult, trackAlive: Bool, now: TimeInterval) -> Presence {
-        guard trackAlive else {
-            // İz koptu: doğrulama düşer, yeni iz baştan doğrulanmalı.
-            consecutiveOwnerFrames = 0
-            verified = false
-            return .absent
-        }
-        switch match {
-        case .owner:
+        // Yalnızca sahip karesi "görülme"yi ileri taşır. Kaçırılan/kopan iz ya da
+        // yabancı/belirsiz kare doğrulamaya doğru sayımı sıfırlar AMA doğrulamayı
+        // anında düşürmez — tek de-doğrulama yolu 1,5 sn'lik zaman aşımıdır (histerezis).
+        if match == .owner, trackAlive {
             consecutiveOwnerFrames += 1
             lastOwnerSeen = now
             if consecutiveOwnerFrames >= Self.framesToVerify { verified = true }
-        case .stranger, .uncertain:
-            consecutiveOwnerFrames = 0   // doğrulamaya doğru sayımı sıfırla (verified timeout'la düşer)
+        } else {
+            consecutiveOwnerFrames = 0
         }
         if verified, now - lastOwnerSeen <= Self.absenceTimeout {
             return .present

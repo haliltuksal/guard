@@ -15,10 +15,11 @@ public struct GuardEngine: Sendable {
     private var lockout = LockoutPolicy()
     private var lid: LidAngleLogic
     private var motion: MotionLogic
-    private var scene: SceneHealthLogic
     private var session: SessionRecord?
     private var bootSession = ""
     private var requestedTurn: Turn = .left
+    private var strangerStreak = 0   // T1 debounce: ardışık yabancı/belirsiz kare sayısı
+    private static let strangerFramesToLock = 3
 
     public init(clock: Clock,
                 settings: GuardSettings = GuardSettings(),
@@ -28,7 +29,6 @@ public struct GuardEngine: Sendable {
         self.verifyPasscode = verifyPasscode
         self.lid = LidAngleLogic(sensitivity: settings.lid)
         self.motion = MotionLogic(sensitivity: settings.motion)
-        self.scene = SceneHealthLogic(cameraShiftEnabled: settings.cameraShiftDetection)
     }
 
     public mutating func handle(_ event: GuardEvent) -> [GuardEffect] {
@@ -81,9 +81,15 @@ public struct GuardEngine: Sendable {
     private mutating func handleFrame(_ f: FrameSummary) -> [GuardEffect] {
         switch state {
         case .guarding(let presence):
-            // Yabancı/belirsiz yüz her alt durumda kilitler (T1).
+            // Yabancı/belirsiz yüz her alt durumda kilitler (T1) — ama tek kare değil:
+            // 3 ardışık tehdit karesi gerekir (sahibin kafasını çevirdiği tek kötü kareyi eler).
             if f.strangerFacePresent || f.uncertainFacePresent {
-                return lock(.strangerFace, now: f.timestamp, bystander: true)
+                strangerStreak += 1
+                if strangerStreak >= Self.strangerFramesToLock {
+                    return lock(.strangerFace, now: f.timestamp, bystander: true)
+                }
+            } else {
+                strangerStreak = 0
             }
             let ownerThisFrame = f.ownerTrack?.present == true
             let match: MatchResult = ownerThisFrame ? .owner : .uncertain
@@ -241,6 +247,7 @@ public struct GuardEngine: Sendable {
 
     private mutating func lock(_ reason: LockReason, now: TimeInterval, bystander: Bool = false) -> [GuardEffect] {
         requestedTurn = [.left, .right, .up][Int(now.magnitude) % 3]
+        strangerStreak = 0
         state = .locked(LockedContext(reason: reason, since: now, bystanderPresent: bystander))
         var fx: [GuardEffect] = [.showShield(.searching), .setInputPolicy(.blockAll), .wakeKeep(true)]
         fx.append(log(.triggered(reason)))

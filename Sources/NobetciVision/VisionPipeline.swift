@@ -2,6 +2,7 @@ import CoreVideo
 import CoreGraphics
 import CoreImage
 import Foundation
+import Vision
 import NobetciCore
 
 /// Görüntü hattının yapılandırması: sahip profili, eşikler ve mesafe (en küçük
@@ -12,13 +13,15 @@ public struct PipelineConfig: Sendable {
     public var minFaceHeight: CGFloat     // normalize (0–1); mesafe hassasiyeti
     public var minBodyHeight: CGFloat
     public var strictMode: Bool
+    public var cameraShiftEnabled: Bool
     public init(profile: [[Float]], thresholds: Thresholds,
-                minFaceHeight: CGFloat, minBodyHeight: CGFloat, strictMode: Bool) {
+                minFaceHeight: CGFloat, minBodyHeight: CGFloat, strictMode: Bool, cameraShiftEnabled: Bool) {
         self.profile = profile
         self.thresholds = thresholds
         self.minFaceHeight = minFaceHeight
         self.minBodyHeight = minBodyHeight
         self.strictMode = strictMode
+        self.cameraShiftEnabled = cameraShiftEnabled
     }
 
     public static func minFaceHeight(for distance: DistanceSensitivity) -> CGFloat {
@@ -30,13 +33,22 @@ public struct PipelineConfig: Sendable {
     }
 }
 
+/// Kare işleme çıktısı: motor için özet (skip karelerde nil → motoru yanıltma) ve
+/// gerekirse kamera sağlık olayı (T6 örtülü/karanlık, T8 kayma).
+public struct PipelineOutput: Sendable {
+    public var summary: FrameSummary?
+    public var cameraHealth: CameraHealth?
+}
+
 /// Kareden `FrameSummary` üretir. Çekirdek yalnızca bu özeti görür. Ağ yok;
 /// yabancı vektörleri saklanmaz. Çalışma anı doğruluğu cihazda ölçülür (D13/D14).
-/// `@unchecked Sendable`: `process` yalnızca tek seri kamera kuyruğundan çağrılır.
+/// `@unchecked Sendable`: `process` yalnızca tek seri kamera kuyruğundan çağrılır;
+/// `locked`/`requestedTurn` kilitle korunur (ana iş parçacığından yazılır).
 public final class VisionPipeline: @unchecked Sendable {
     private let detector: FaceDetector
     private let embedder: FaceEmbedder
     private let matcher: FaceMatcher
+    private let scene: SceneHealthLogic
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
     private var analyzer = FrameAnalyzer()
@@ -48,29 +60,40 @@ public final class VisionPipeline: @unchecked Sendable {
     private var lastBlink: TimeInterval?
     private var lastPersonSeen: TimeInterval?
     private var lastFullAnalysis: TimeInterval = -.greatestFiniteMagnitude
+    private var previousShiftBuffer: CVPixelBuffer?
 
-    /// Sıkı modda istenen baş hareketi; uygulama katmanı motor istedikçe ayarlar.
-    public var requestedTurn: Turn?
+    private let stateLock = NSLock()
+    private var _requestedTurn: Turn?
+    private var _locked = false
 
     public init(detector: FaceDetector, embedder: FaceEmbedder, config: PipelineConfig) {
         self.detector = detector
         self.embedder = embedder
         self.config = config
         self.matcher = FaceMatcher(profile: config.profile, thresholds: config.thresholds)
+        self.scene = SceneHealthLogic(cameraShiftEnabled: config.cameraShiftEnabled)
     }
 
-    public func process(_ pixelBuffer: CVPixelBuffer, now: TimeInterval) -> FrameSummary {
-        let metrics = analyzer.analyze(gray: Self.downsampleGray(pixelBuffer))
-        var summary = FrameSummary.empty
-        summary.timestamp = now
+    /// Sıkı modda istenen baş hareketi; motor gesture isteyince ana iş parçacığı ayarlar.
+    public func setRequestedTurn(_ turn: Turn?) { stateLock.withLock { _requestedTurn = turn } }
+    /// Kilit durumu; kilitliyken blink için her kare tam analiz yapılır (§6.2).
+    public func setLocked(_ locked: Bool) { stateLock.withLock { _locked = locked } }
 
-        let needFull = metrics.motionEnergy > 0.02 || (now - lastFullAnalysis) >= 0.5
+    public func process(_ pixelBuffer: CVPixelBuffer, now: TimeInterval) -> PipelineOutput {
+        let metrics = analyzer.analyze(gray: Self.downsampleGray(pixelBuffer))
+        // T6: örtülü/karanlık — her karede (ucuz). Kilit tetiklenmesi çekirdekte.
+        if scene.isCovered(brightness: Double(metrics.brightness), texture: Double(metrics.texture)) {
+            return PipelineOutput(summary: nil, cameraHealth: .covered)
+        }
+        let (locked, requestedTurn) = stateLock.withLock { (_locked, _requestedTurn) }
+        let needFull = locked || metrics.motionEnergy > 0.02 || (now - lastFullAnalysis) >= 0.5
         guard needFull, let detections = try? detector.detect(in: pixelBuffer) else {
-            summary.sceneEmptyFor = sceneEmptyDuration(now: now, anyPerson: false)
-            return summary
+            return PipelineOutput(summary: nil, cameraHealth: nil)   // skip: motora kare gönderme
         }
         lastFullAnalysis = now
 
+        var summary = FrameSummary.empty
+        summary.timestamp = now
         let w = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
         let h = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
 
@@ -114,7 +137,28 @@ public final class VisionPipeline: @unchecked Sendable {
         summary.anyPersonPresent = anyPerson
         summary.blinkObservedWithin = lastBlink.map { now - $0 }
         summary.sceneEmptyFor = sceneEmptyDuration(now: now, anyPerson: anyPerson)
-        return summary
+
+        // T8: kişi yokken kamera açısı/konumu kaydı (kapak sensörü olmayan Mac yedeği).
+        var health: CameraHealth?
+        if !anyPerson {
+            if let prev = previousShiftBuffer, isShifted(from: prev, to: pixelBuffer, width: w) { health = .shifted }
+            previousShiftBuffer = pixelBuffer
+        } else {
+            previousShiftBuffer = nil
+        }
+        return PipelineOutput(summary: summary, cameraHealth: health)
+    }
+
+    /// İki kare arasındaki genel öteleme kaydını Vision ile ölçer; eşiği aşarsa kayma.
+    private func isShifted(from previous: CVPixelBuffer, to current: CVPixelBuffer, width: CGFloat) -> Bool {
+        guard config.cameraShiftEnabled else { return false }
+        let request = VNTranslationalImageRegistrationRequest(targetedCVPixelBuffer: current)
+        guard (try? VNImageRequestHandler(cvPixelBuffer: previous, options: [:]).perform([request])) != nil,
+              let observation = request.results?.first as? VNImageTranslationAlignmentObservation else { return false }
+        let tx = abs(observation.alignmentTransform.tx)
+        let ty = abs(observation.alignmentTransform.ty)
+        let fraction = max(tx, ty) / max(width, 1)
+        return scene.isShifted(translationFraction: Double(fraction))
     }
 
     private func sceneEmptyDuration(now: TimeInterval, anyPerson: Bool) -> TimeInterval {

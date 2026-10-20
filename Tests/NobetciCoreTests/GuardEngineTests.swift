@@ -57,12 +57,25 @@ private func contains(_ effects: [GuardEffect], lock reason: LockReason) -> Bool
 
 // Tetikleyiciler ---------------------------------------------------------
 
-@Test func strangerFaceLocksEvenWhenOwnerPresent() {
+@Test func strangerLocksAfterThreeConsecutiveFramesNotOne() {
     var e = started()
-    var f = FrameSummary.empty; f.strangerFacePresent = true; f.timestamp = 0.1
-    let fx = e.handle(.frame(f))
-    if case .locked(let c) = e.state { #expect(c.reason == .strangerFace) } else { Issue.record("kilit beklenirdi") }
+    func stranger(_ t: TimeInterval) -> FrameSummary { var f = FrameSummary.empty; f.strangerFacePresent = true; f.timestamp = t; return f }
+    _ = e.handle(.frame(stranger(0.1)))   // 1 — tek kare kilitlemez (sahip kafasını çevirmiş olabilir)
+    _ = e.handle(.frame(stranger(0.2)))   // 2
+    if case .guarding = e.state {} else { Issue.record("iki karede kilitlenmemeli") }
+    let fx = e.handle(.frame(stranger(0.3)))   // 3 → kilit
+    if case .locked(let c) = e.state { #expect(c.reason == .strangerFace) } else { Issue.record("üçüncü karede kilit beklenirdi") }
     #expect(fx.contains(.setInputPolicy(.blockAll)))
+}
+
+@Test func ownerFrameResetsStrangerStreak() {
+    var e = started()
+    func stranger(_ t: TimeInterval) -> FrameSummary { var f = FrameSummary.empty; f.strangerFacePresent = true; f.timestamp = t; return f }
+    _ = e.handle(.frame(stranger(0.1)))
+    _ = e.handle(.frame(stranger(0.2)))
+    _ = e.handle(.frame(ownerFrame(at: 0.25)))   // sahip göründü → sayaç sıfırlanır
+    _ = e.handle(.frame(stranger(0.3)))
+    if case .guarding = e.state {} else { Issue.record("sayaç sıfırlandığı için kilitlenmemeli") }
 }
 
 @Test func inputLocksOnlyWhenOwnerAbsent() {
