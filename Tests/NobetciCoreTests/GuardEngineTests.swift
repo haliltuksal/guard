@@ -147,13 +147,23 @@ private func leave(_ e: inout GuardEngine) {
 
 // Kilit açma -------------------------------------------------------------
 
-@Test func faceUnlockClosesGuardByDefault() {
+@Test func faceUnlockKeepsGuardingByDefault() {
     var e = started()
     _ = e.handle(.input)                        // present: no-op
     leave(&e)  // absent
     _ = e.handle(.input)                        // → locked(.input)
     let fx = e.handle(.frame(ownerFrame(at: 3.0)))
-    #expect(e.state == .off)                    // closeGuard varsayılan
+    #expect(e.state == .guarding(.present))     // varsayılan: nöbet sürer ("Buradayım" diyene kadar)
+    #expect(fx.contains(.hideShield) && !fx.contains(.stopSensors))
+}
+
+@Test func faceUnlockClosesGuardWhenConfigured() {
+    var s = GuardSettings(); s.returnBehavior = .closeGuard
+    var e = started(settings: s)
+    leave(&e)
+    _ = e.handle(.input)                        // → locked(.input)
+    let fx = e.handle(.frame(ownerFrame(at: 3.0)))
+    #expect(e.state == .off)
     #expect(fx.contains(.hideShield) && fx.contains(.stopSensors))
 }
 
@@ -174,7 +184,7 @@ private func leave(_ e: inout GuardEngine) {
     #expect(wrong.contains(.logEvent(.wrongPasscode)))
     if case .locked = e.state {} else { Issue.record("hâlâ kilitli olmalı") }
     let ok = e.handle(.passcode("dogru"))
-    #expect(e.state == .off)
+    #expect(e.state == .guarding(.present))     // açıldı; varsayılan nöbet sürer
     #expect(ok.contains(.logEvent(.unlockedByPasscode)))
 }
 

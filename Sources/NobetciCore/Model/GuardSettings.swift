@@ -33,7 +33,7 @@ public struct HotKeySpec: Codable, Equatable, Sendable {
 
 /// Kullanıcı tercihleri. İmzalı dosyada saklanır (spec §9.1); varsayılanlar spec §8.5.
 public struct GuardSettings: Codable, Equatable, Sendable {
-    public var returnBehavior: ReturnBehavior = .closeGuard
+    public var returnBehavior: ReturnBehavior = .keepGuarding   // kullanıcı kararı: "Buradayım" diyene kadar nöbet sürer
     public var distance: DistanceSensitivity = .medium
     public var lid: Sensitivity = .medium
     public var motion: Sensitivity = .medium

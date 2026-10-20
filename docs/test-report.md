@@ -85,3 +85,16 @@ Her satır çalıştırıldığında ölçümüyle buraya yazılacak.
 | R9–R11 | Kamera ✓ hiç yanmıyordu; pipeline/kamera nöbetler arası sızıyordu; kurulum açılışta değil menüye tıklayınca geliyordu | Küçük | Düzeltildi |
 
 79 test yeşil. Doğru olduğu yeniden izlenen: durum geçişleri, T1 debounce, histerezis, monoton bekleme, kripto, girdi sızmazlığı, hizalama, seri olay kanalı.
+
+## 6. Cihazda ilk sonuçlar (2026-10-21, gece, Halil'in Mac'i)
+
+| Konu | Sonuç |
+|---|---|
+| Yüz tanıma (canlı, FaceCrop hattı) | 282/282 kare "sahip", skor ort. 0,90, min 0,71 ✅ |
+| D13 canlılık (göz kırpma, EAR) | 10 sn'de **3 kırpma**; EAR açık ≈0,26 / kapalı ≈0,08 ✅ |
+| Yüzle kilit açma | Çalışıyor (02:21:47 "Yüzle açıldı") ✅ |
+| Kamera ısınması | İlk ~9 kare siyah (parlaklık 0,000) → T6 süreklilik kapısı (≥0,5 sn) eklendi |
+| Kafa çevirme | 12/263 kare <0,70 → iz sürekliliği: sahip izi tehdit değil |
+| Kadraja geri giriş | 0,1 sn'de "yabancı yüz" → T1 iz-başına 0,5 sn kabul süresi (spec) |
+| Gece odası | parlaklık 0,29, doku 0,04 → "loş" eşiği 0,2, doku 0,01 (örtülü değil) |
+| Dönüş davranışı | Kullanıcı kararı: varsayılan **nöbet sürsün**; durdurma = "Buradayım" |

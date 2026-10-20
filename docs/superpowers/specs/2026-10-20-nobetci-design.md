@@ -213,8 +213,8 @@ Yan etkileri uygulama katmanındaki `EffectRunner` adaptörlere dağıtır.
 - Sayaç Keychain'de tutulur; uygulama yeniden başlasa da sürer. Bekleme süresi açılış oturumu içinde monoton saatle ölçülür (sistem saatini oynatmaya dayanıklı); Mac yeniden başlarsa o anki bekleme süresi baştan uygulanır.
 
 ### 5.5 Dönüş davranışı (ayar)
-- **Nöbet kapansın (varsayılan):** Kilit açılınca ya da kilit olmadan sahip ≥ 1,5 sn yokluktan sonra tanınınca → Kapalı. Uyanık tutma biter, kamera kapanır.
-- **Nöbet sürsün:** Kilit açılınca → Nöbette · sahip var. Kamera açık kalır (omuz üstü koruması). Nöbet sahip varken menüden ya da kısayolla kapatılır.
+- **Nöbet sürsün (varsayılan — kullanıcı kararı 2026-10-21):** Kilit açılınca → Nöbette · sahip var. Kamera açık kalır (omuz üstü koruması). Nöbet, sahip varken menüdeki **"Buradayım"** ile ya da kısayolla kapatılır.
+- **Nöbet kapansın:** Kilit açılınca ya da kilit olmadan sahip ≥ 1,5 sn yokluktan sonra tanınınca → Kapalı. Uyanık tutma biter, kamera kapanır.
 
 ### 5.6 Olay kaydı ve rapor
 Her nöbet bir oturum kaydıdır: başlangıç ve bitiş, süre, olaylar (zaman, tür, ayrıntı) ve sayaçlar.
@@ -397,7 +397,7 @@ Ortada cam efektli bir kart:
 |---|---|---|
 | Genel | Girişte başlat | Açık |
 | | Klavye kısayolu | ⌃⌥⌘L |
-| | Dönüş davranışı | Nöbet kapansın |
+| | Dönüş davranışı | Nöbet sürsün |
 | Algılama | Mesafe hassasiyeti | Orta (≈ 1,5 m) |
 | | Kapak hassasiyeti | Orta |
 | | Hareket hassasiyeti | Orta |

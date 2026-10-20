@@ -23,3 +23,7 @@ doğrulama (izinler, görsel kontroller, imza) bekliyor — bkz `docs/test-repor
 ### Bilinçli olarak dışarıda
 - Fotoğraf çekme.
 - "Aktif görünme" (Slack/Teams boşta kalma sayaçlarını sahte girdiyle sıfırlama).
+
+### Değişenler (2026-10-21)
+- Dönüş davranışı varsayılanı "nöbet sürsün" (kullanıcı kararı); menüde "Buradayım".
+- T1 zamanlaması iz başına (0,5 sn kabul / 3 kare T_red altı); T6 ≥0,5 sn süreklilik.

@@ -62,6 +62,7 @@ public final class VisionPipeline: @unchecked Sendable {
     private var lastFullAnalysis: TimeInterval = -.greatestFiniteMagnitude
     private var previousShiftBuffer: CVPixelBuffer?
     private var coveredDebounce = CoveredDebouncer()
+    private var threats = ThreatTracker()
     private var ownerTrackID: Int?
     private var ownerTrackLastSeen: TimeInterval = -.greatestFiniteMagnitude
     private static let ownerTrackMemory: TimeInterval = 1.5
@@ -113,13 +114,20 @@ public final class VisionPipeline: @unchecked Sendable {
         // FARKLI bir izdir. Sahip izi 1,5 sn hatırlanır; sürdürme eşiği de buna bağlıdır.
         let ids = tracker.updateAssigning(boxes: detections.faces.map(\.boundingBox), now: now).ids
         let ownerTrackRecent = ownerTrackID != nil && now - ownerTrackLastSeen <= Self.ownerTrackMemory
+        threats.retain(onlyIDs: Set(ids))
+
+        // T1 zamanlaması iz başına (spec): belirsiz → 0,5 sn kabul süresi; yabancı → 3 ardışık T_red altı.
+        func flag(_ r: (uncertain: Bool, stranger: Bool)) {
+            if r.uncertain { uncertainPresent = true }
+            if r.stranger { strangerPresent = true }
+        }
 
         for (i, face) in detections.faces.enumerated() where face.boundingBox.height >= config.minFaceHeight {
             let isOwnerTrack = ownerTrackRecent && ids[i] == ownerTrackID
             guard face.landmarks5.count == 5,
                   let aligned = alignedFace(pixelBuffer: pixelBuffer, face: face, imageW: w, imageH: h),
                   let vector = try? embedder.embed(aligned) else {
-                if !isOwnerTrack { uncertainPresent = true }
+                if !isOwnerTrack { flag(threats.observe(trackID: ids[i], belowReject: false, now: now)) }
                 continue
             }
             switch matcher.classify(vector, hasVerifiedTrack: ownerTrackRecent) {
@@ -127,10 +135,11 @@ public final class VisionPipeline: @unchecked Sendable {
                 ownerFace = face
                 ownerTrackID = ids[i]
                 ownerTrackLastSeen = now
+                threats.clear(trackID: ids[i])
             case .stranger:
-                if !isOwnerTrack { strangerPresent = true }
+                if !isOwnerTrack { flag(threats.observe(trackID: ids[i], belowReject: true, now: now)) }
             case .uncertain:
-                if !isOwnerTrack { uncertainPresent = true }
+                if !isOwnerTrack { flag(threats.observe(trackID: ids[i], belowReject: false, now: now)) }
             }
         }
 
