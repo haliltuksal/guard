@@ -11,7 +11,8 @@ let package = Package(
         .target(name: "NobetciSystem", dependencies: ["NobetciCore"]),
         .executableTarget(
             name: "Nobetci",
-            dependencies: ["NobetciCore", "NobetciVision", "NobetciSystem"]
+            dependencies: ["NobetciCore", "NobetciVision", "NobetciSystem"],
+            resources: [.process("Resources")]
         ),
         .executableTarget(name: "nobetci-eval", dependencies: ["NobetciCore", "NobetciVision"]),
         // Test targets are declared as each gains its first test file (SwiftPM

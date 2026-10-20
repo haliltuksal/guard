@@ -10,7 +10,7 @@ struct NobetciApp: App {
         MenuBarExtra("Nöbetçi", systemImage: "shield") {
             Text("Nöbetçi \(version)")
             Divider()
-            Button("Çıkış") { NSApp.terminate(nil) }.keyboardShortcut("q")
+            Button(L10n.t("menu.quit")) { NSApp.terminate(nil) }.keyboardShortcut("q")
         }
         .menuBarExtraStyle(.window)
     }

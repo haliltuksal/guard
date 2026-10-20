@@ -1,0 +1,12 @@
+/* Menü */
+"menu.away" = "Uzaktayım";
+"menu.stop" = "Korumayı kapat";
+"menu.quit" = "Çıkış";
+
+/* Kalkan */
+"shield.title" = "%@'ın Mac'i korunuyor";
+"shield.camera" = "Kamera etkin";
+"shield.searching" = "Seni arıyorum…";
+"shield.blink" = "Merhaba %@, göz kırp";
+"shield.bystander" = "Yanında biri var — şifre gerekli";
+"shield.retry" = "%d sn sonra tekrar dene";
