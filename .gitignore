@@ -1,0 +1,9 @@
+.build/
+build/
+*.mlpackage
+*.mlmodelc
+tools/model/.venv/
+tools/model/weights/
+tools/model/data/
+docs/test-assets/clips/
+.DS_Store
