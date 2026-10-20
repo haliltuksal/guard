@@ -18,7 +18,7 @@
 ### 1.1 Problem
 Kullanıcı bilgisayardan kısa süreliğine kalkarken iki şeyi aynı anda istiyor:
 
-1. Mac uyumasın, kilitlenmesin, kendisi Slack/Teams gibi uygulamalarda "aktif" görünmeye devam etsin (caffeinate + "press-key").
+1. Mac uyumasın ve otomatik kilitlenmesin; döndüğünde ekran açık ve çalışır durumda olsun (caffeinate benzeri uyku engelleme).
 2. Bu sürede ekranı başkası görmesin, bilgisayarı başkası kullanamasın.
 
 macOS'un kendi kilidi ikinciyi çözer ama birinciyi bozar. Uyku engelleyiciler birinciyi çözer ama ikinciyi bozar.
@@ -26,7 +26,7 @@ macOS'un kendi kilidi ikinciyi çözer ama birinciyi bozar. Uyku engelleyiciler 
 ### 1.2 Çözüm özeti
 Nöbetçi, menü çubuğunda çalışan bir macOS uygulamasıdır. Kullanıcı kalkarken "Uzaktayım" der (menüden ya da ⌃⌥⌘L ile). Nöbet süresince:
 
-- Mac uyanık tutulur, kullanıcı aktif gösterilir.
+- Mac uyanık tutulur; ekran koruyucu ve otomatik kilit devreye girmez.
 - Dahili kamera, kapak açısı sensörü, ivmeölçer, girdi olayları ve fiziksel bağlantılar izlenir.
 - Sahibin dışında biri görünür ya da herhangi bir müdahale olursa tüm ekranlar anında bulanıklaşır, tüm girdiler kapanır.
 - Kilit yalnızca **sahibin yüzü (canlılık kontrolüyle)** ya da **uygulamaya özel şifre** ile açılır.
@@ -39,7 +39,7 @@ Halil ve birkaç arkadaşı (ör. Fatih). Uygulama dosya (DMG) olarak paylaşıl
 1. Sahip yokken biri gelirse ekran **1 sn'den kısa sürede** okunamaz hale gelir ve **hiçbir girdi hiçbir uygulamaya ulaşmaz** (tetikleyici bazında hedefler §5.3).
 2. Sahip döndüğünde kilit şifresiz, ortanca **≤ 1,5 sn** içinde açılır.
 3. Sahip, yanlış alarmda ya da tanınmadığında **asla bilgisayarına kilitli kalmaz** (şifre ve kurtarma yolu, §3.5).
-4. Nöbet boyunca Mac uyumaz, ekran koruyucu ve otomatik kilit devreye girmez, Slack ve Teams'te durum "aktif" kalır (≥ 15 dk kabul testi).
+4. Nöbet boyunca Mac uyumaz, ekran koruyucu ve otomatik kilit devreye girmez (≥ 15 dk kabul testi).
 5. Hiçbir veri cihazdan çıkmaz (ağ kodu yoktur; testle doğrulanır).
 6. Tüm kabul testleri (§13.4) geçer ve sonuçları ölçümleriyle birlikte `docs/test-report.md` dosyasında kayıtlıdır.
 
@@ -49,6 +49,7 @@ Halil ve birkaç arkadaşı (ör. Fatih). Uygulama dosya (DMG) olarak paylaşıl
 - Özel hazırlanmış saldırılar: 3B maske, canlı deepfake
 - Gerçek macOS kilit ekranına geçiş (kullanıcı kararı)
 - Korumadan bağımsız "yalnızca uyanık tut" modu (kullanıcı kararı)
+- **Sahte etkinlik ("aktif görünme"):** Slack/Teams gibi araçların okuduğu boşta kalma sayaçlarını sentetik klavye/fare olaylarıyla sıfırlamak. Kullanıcı gerçekte uzaktayken başkalarına masasındaymış izlenimi verdiği için **bilinçli olarak yapılmaz** (2026-10-20 kararı). Uygulama hiçbir koşulda kullanıcı adına girdi olayı üretmez; uyku engelleme yalnızca güç bildirimleriyle yapılır (§7.6).
 - Telefona bildirim, otomatik güncelleme, İngilizce arayüz, Intel Mac, birden fazla sahip
 - Fotoğraf çekme (kilit tetiklenince, yanlış şifrede ya da kameraya giren kişilerin) — kullanıcı kararıyla çıkarıldı (2026-10-20)
 
@@ -105,7 +106,7 @@ Tetikleyici (§5.3) → kalkan iner, girdiler kapanır, olay kaydedilir. Kalkan 
 |---|---|---|---|
 | `NobetciCore` | kütüphane | Durum makinesi; tetikleme ve kilit açma kuralları; eşleştirme kararı; göz kırpma tespiti; kapak/ivme eşik mantığı; şifre doğrulama ve bekleme; olay kaydı ve rapor modeli; ayar modeli ve bütünlüğü | Foundation, CryptoKit, CommonCrypto |
 | `NobetciVision` | kütüphane | Kamera yakalama; kare analizi; yüz hizalama; Core ML yüz modeli; iz takibi; sahne sağlığı; canlılık sinyalleri | Core, AVFoundation, Vision, CoreML, Accelerate |
-| `NobetciSystem` | kütüphane | macOS adaptörleri: kapak sensörü, ivmeölçer, girdi filtresi, kalkan pencereleri, kiosk kilitleri, uyanık tutma/aktif gösterme, fiziksel müdahale izleme, uyku/uyanma, global kısayol, süreç yaşam döngüsü, Keychain, şifreli depo | Core, IOKit, CoreGraphics, AppKit, ServiceManagement, Security, CryptoKit, LocalAuthentication |
+| `NobetciSystem` | kütüphane | macOS adaptörleri: kapak sensörü, ivmeölçer, girdi filtresi, kalkan pencereleri, kiosk kilitleri, uyanık tutma, fiziksel müdahale izleme, uyku/uyanma, global kısayol, süreç yaşam döngüsü, Keychain, şifreli depo | Core, IOKit, CoreGraphics, AppKit, ServiceManagement, Security, CryptoKit, LocalAuthentication |
 | `Nobetci` | uygulama | SwiftUI menü çubuğu, kurulum sihirbazı, kalkan arayüzü, ayarlar, rapor; kompozisyon kökü ve `EffectRunner` | Hepsi, SwiftUI |
 | `nobetci-eval` | komut satırı aracı (dağıtılmaz) | Yüz modeli değerlendirme düzeneği; üretimdeki hattın **aynısını** kullanır | Core, Vision |
 | `tools/model` | Python (uv), derleme zamanı | Ağırlık indirme (SHA-256 doğrulamalı), Core ML'e dönüştürme, eşitlik testi | — |
@@ -119,7 +120,7 @@ Kurallar:
 `GuardEngine` saf bir indirgeyicidir: `reduce(state, event, context) -> (newState, [Effect])`.
 
 - **Event:** kare özeti (`FrameSummary`), kamera sağlığı, kapak açısı örneği, ivme özeti, girdi olayı, fiziksel olay, uyku/uyanma, şifre denemesi, kullanıcı komutları (nöbet başlat/kapat), zaman tıkı, açılış.
-- **Effect:** sensörleri başlat/durdur; kalkanı göster/kaldır; girdi politikasını ayarla; uyanık tutmayı aç/kapa; aktif göstermeyi aç/kapa; olay kaydet; bildirim göster; raporu göster; durumu kalıcı yaz.
+- **Effect:** sensörleri başlat/durdur; kalkanı göster/kaldır; girdi politikasını ayarla; uyanık tutmayı aç/kapa; olay kaydet; bildirim göster; raporu göster; durumu kalıcı yaz.
 - **Context:** ayarlar, enjekte edilen saat, sahip profili meta verisi.
 
 Yan etkileri uygulama katmanındaki `EffectRunner` adaptörlere dağıtır.
@@ -155,7 +156,7 @@ Yan etkileri uygulama katmanındaki `EffectRunner` adaptörlere dağıtır.
 | Kapalı | Kamera ve sensörler kapalı, uyku ayarları normal | Nöbet başlat → Hazırlık |
 | Hazırlık | Ön koşul kontrolü (~1 sn) | Başarılı → Nöbette (sahip var ya da yok); başarısız → Kapalı + sorun listesi |
 | Nöbette · sahip var | Kullanım serbest; uyanık tutma açık | Yabancı yüz (T1) ya da T12–T14 → Kilitli; sahip ≥ 1,5 sn görünmez → Nöbette · sahip yok; kapat → Kapalı |
-| Nöbette · sahip yok | Ekran görünür; uyanık tutma ve aktif gösterme açık; tüm tetikleyiciler etkin | Herhangi bir tetikleyici → Kilitli; sahip tanınır → dönüş davranışı (§5.5) |
+| Nöbette · sahip yok | Ekran görünür; uyanık tutma açık; tüm tetikleyiciler etkin | Herhangi bir tetikleyici → Kilitli; sahip tanınır → dönüş davranışı (§5.5) |
 | Kilitli | Kalkan + tüm girdiler kapalı + kiosk kilitleri | Yüz ya da şifre (§5.4) → dönüş davranışı (§5.5) |
 
 **Hazırlık ön koşulları (hepsi zorunlu):** kamera izni; erişilebilirlik izni; yüz profili; uygulama şifresi; seçili kameranın açılması ve ilk 10 karenin sağlıklı gelmesi; modelin yüklenmesi; Keychain erişimi; girdi filtresinin kurulabilmesi.
@@ -212,7 +213,7 @@ Yan etkileri uygulama katmanındaki `EffectRunner` adaptörlere dağıtır.
 - Sayaç Keychain'de tutulur; uygulama yeniden başlasa da sürer. Bekleme süresi açılış oturumu içinde monoton saatle ölçülür (sistem saatini oynatmaya dayanıklı); Mac yeniden başlarsa o anki bekleme süresi baştan uygulanır.
 
 ### 5.5 Dönüş davranışı (ayar)
-- **Nöbet kapansın (varsayılan):** Kilit açılınca ya da kilit olmadan sahip ≥ 1,5 sn yokluktan sonra tanınınca → Kapalı. Uyanık tutma ve aktif gösterme biter, kamera kapanır.
+- **Nöbet kapansın (varsayılan):** Kilit açılınca ya da kilit olmadan sahip ≥ 1,5 sn yokluktan sonra tanınınca → Kapalı. Uyanık tutma biter, kamera kapanır.
 - **Nöbet sürsün:** Kilit açılınca → Nöbette · sahip var. Kamera açık kalır (omuz üstü koruması). Nöbet sahip varken menüden ya da kısayolla kapatılır.
 
 ### 5.6 Olay kaydı ve rapor
@@ -311,9 +312,9 @@ Protokol:
   - `geçir` — Nöbette · sahip var
   - `ilkGirdideKilitle` — Nöbette · sahip yok
   - `hepsiniEngelle` — Kilitli
-- `ilkGirdideKilitle`: İşaretsiz ilk olayda tap politikayı **kendisi** `hepsiniEngelle` yapar (yarış koşulu olmasın), olayı yutar ve motora bildirir.
+- `ilkGirdideKilitle`: İlk olayda tap politikayı **kendisi** `hepsiniEngelle` yapar (yarış koşulu olmasın), olayı yutar ve motora bildirir.
 - `hepsiniEngelle`: Tüm olaylar yutulur. keyDown olaylarından karakter, etkin klavye düzenine göre (`UCKeyTranslate`, ölü tuş durumu dahil) çözülür ve kalkandaki şifre alanına aktarılır; Return, Delete ve Esc özel işlenir.
-- Uygulamanın kendi sentetik olayları `eventSourceUserData` alanındaki sabit bir imzayla işaretlenir ve geçirilir.
+- Uygulama hiçbir sentetik girdi olayı üretmez; dolayısıyla filtrede "kendi olayını tanıma" istisnası yoktur. Filtreden geçen her olay gerçek ya da üçüncü taraf kaynaklıdır.
 - `tapDisabledByTimeout` / `tapDisabledByUserInput` gelince tap anında yeniden etkinleştirilir; 0,5 sn'de bir sağlık kontrolü yapılır; 3 başarısız denemede T14.
 - **Güvenli giriş (Secure Event Input):** Kilitlenirken uygulama öne alınır; `IsSecureEventInputEnabled()` izlenir ve tanılama kaydına yazılır (D7).
 
@@ -330,11 +331,11 @@ Protokol:
 - Menü çubuğu (accessory) uygulamasında çalışmazsa (D8): kilitliyken etkinleştirme politikası geçici olarak `.regular` yapılır.
 - `applicationShouldTerminate`, nöbette (sahip yokken) ve kilitliyken iptal eder.
 
-### 7.6 Uyanık tutma ve aktif gösterme
-- Nöbet boyunca `kIOPMAssertionTypePreventUserIdleDisplaySleep` ve `kIOPMAssertionTypePreventUserIdleSystemSleep` bildirimleri tutulur.
-- Sahip yokken (Kilitli dahil) her 30 sn'de bir, imlecin bulunduğu konuma sıfır mesafeli, işaretli bir `mouseMoved` olayı HID seviyesine gönderilir. Sahip varken gönderilmez.
-- **Doğrulandı:** `IOPMAssertionDeclareUserActivity` tek başına yetersizdir (V6). Erişilebilirlik izni olmadan gönderilen sentetik olay yalnızca HIDIdleTime'ı sıfırlar (V7).
-- **Doğrulanacak (D3, D4):** Erişilebilirlik izniyle sentetik olayın Slack'in ölçtüğü sayacı (V5) sıfırlaması; Teams'in aktif kalması; ekran koruyucu ve ekran uykusunun engellenmesi. Yedekler sırasıyla: oturum seviyesine gönderim → `flagsChanged` olayı → `IOHIDPostEvent(NX_NULLEVENT)`.
+### 7.6 Uyanık tutma
+- Nöbet boyunca `kIOPMAssertionTypePreventUserIdleDisplaySleep` ve `kIOPMAssertionTypePreventUserIdleSystemSleep` bildirimleri tutulur. Böylece Mac uyumaz, ekran kararmaz, ekran koruyucu ve boşta kalmaya bağlı otomatik kilit devreye girmez; kalkan gerektiği sürece ekranda kalır.
+- Bu bildirimler yalnızca güç yönetimine "uyuma" der; **sahte girdi üretmez ve boşta kalma sayaçlarını sıfırlamaz** (`IOPMAssertionDeclareUserActivity` bile sayaçları sıfırlamaz — V6). Sen uzaktayken Slack/Teams gibi araçlar seni doğru şekilde "boşta" gösterir; bu kasıtlıdır (§1.5).
+- Bildirimler nöbet bitince (Kapalı'ya geçişte) serbest bırakılır; uygulama çökerse macOS bunları otomatik temizler.
+- **Doğrulanacak (D4):** Ekran koruyucu 1 dk'ya ayarlıyken 15 dk nöbette başlamaması; ekranın kararmaması; otomatik kilidin açılmaması. Yedek: `caffeinate -d -i` alt süreci (aynı bildirimleri kullanır, farklı yol).
 
 ### 7.7 Fiziksel müdahale izleme
 - **Ekran:** `CGDisplayRegisterReconfigurationCallback`.
@@ -365,7 +366,7 @@ Carbon `RegisterEventHotKey` (izin gerektirmez). Varsayılan ⌃⌥⌘L; ayarlar
 - **Panel** (`MenuBarExtra`, pencere stili):
   - Kapalıyken: büyük "Uzaktayım" butonu (kısayol ipucuyla), durum satırı, son nöbet özeti, Ayarlar…, Çıkış.
   - Ön koşul eksikse buton yerine sorun ve tek tıklık çözüm ("Kamera izni ver" gibi).
-  - Nöbetteyken: süre ("Nöbette · 12 dk"), sensör durumları (kamera, kapak, ivmeölçer, aktif gösterme) ve "Korumayı kapat".
+  - Nöbetteyken: süre ("Nöbette · 12 dk"), sensör durumları (kamera, kapak, ivmeölçer, uyanık tutma) ve "Korumayı kapat".
 
 ### 8.2 Kurulum sihirbazı
 1. **Tanıtım** ve gizlilik sözü (hiçbir veri cihazdan çıkmaz).
@@ -605,7 +606,7 @@ Her madde ölçümüyle birlikte `docs/test-report.md` dosyasına yazılır.
 4. **Blur okunamazlığı:** 12–72 pt, yüksek kontrastlı test sayfası kalkanın arkasındayken ekran görüntüsü alınır; hiçbir yazı okunamamalıdır.
 5. **Kilit açma:** Sahip (3 ışık koşulu, gözlüklü/gözlüksüz) ≥ %98 başarı, ≤ 2 sn. Basılı fotoğraf ve telefon ekranında fotoğraf ile açılmamalı. Göz kırpan video: varsayılan modda sonuç kaydedilir; sıkı modda açılmamalı.
 6. **Şifre:** Türkçe karakterler (ğ ü ş ı ö ç), Option karakterleri, ölü tuşlar; bekleme süreleri; uygulama yeniden başlatılınca sayacın korunması.
-7. **Aktif gösterme:** 15 dk uzaktayken Slack ve Teams'te durum aktif; ekran koruyucu 1 dk'ya ayarlıyken başlamıyor; ekran kararmıyor.
+7. **Uyanık tutma:** 15 dk nöbette Mac uyumuyor; ekran koruyucu 1 dk'ya ayarlıyken başlamıyor; ekran kararmıyor; otomatik kilit açılmıyor. Ayrıca `pmset -g assertions` çıktısında yalnızca uyku engelleme bildirimleri görünüyor, `UserIsActive` yok.
 8. **Yaşam döngüsü:** `kill -9` → ≤ 2 sn'de kilitli açılış; arka arkaya iki kez; uyku/uyanma; yeniden başlatma → Kapalı başlangıç; elle açma → tek kopya.
 9. **İmza:** yeniden derleyip kurunca izinler korunuyor; başka bir Mac'te (Fatih) "Yine de Aç" akışı.
 10. **Gizlilik:** nöbet boyunca ağ bağlantısı yok (`lsof`); diskte şifresiz yüz verisi yok.
@@ -622,7 +623,7 @@ Her madde ölçümüyle birlikte `docs/test-report.md` dosyasına yazılır.
 Ayrıntılı plan ayrı bir dokümanda (`docs/superpowers/plans/`) yazılacaktır.
 
 1. Depo iskeleti, Makefile, test altyapısı, imza sertifikası, `.app` paketleme.
-2. **Erken risk doğrulamaları:** D3 (aktif gösterme), D5–D6 (kalkan), D7 (girdi matrisi), D8–D9 (kiosk ve etkinleştirme), D10 (yaşam döngüsü), D11 (imza). Tasarımın en riskli kısımları bunlardır; sonuçlarına göre ilgili yedek planlar devreye alınır.
+2. **Erken risk doğrulamaları:** D4 (uyanık tutma), D5–D6 (kalkan), D7 (girdi matrisi), D8–D9 (kiosk ve etkinleştirme), D10 (yaşam döngüsü), D11 (imza). Tasarımın en riskli kısımları bunlardır; sonuçlarına göre ilgili yedek planlar devreye alınır.
 3. Model değerlendirme ve seçim (§6.8).
 4. Core: durum makinesi ve kurallar (TDD).
 5. Vision hattı.
@@ -643,9 +644,9 @@ Deney betikleri `tools/probes/` altındadır.
 | V2 | Kapak açısı root olmadan okunuyor: `IOHIDDeviceGetReport` → `[01 65 00]` = 101° | `tools/probes/lid.swift` |
 | V3 | İvmeölçer root olmadan okunuyor: özellik yazımları `0x0` döndü; 2 sn'de 1605 giriş raporu (22 bayt); masadayken (0,019; 0,018; −1,009) g, büyüklük ≈ 1,01 g; istemci kapanınca `ReportInterval` 0'a döndü | `tools/probes/accel.swift`, `ioreg` |
 | V4 | Kameralar: dahili "MacBook Pro Camera" + iPhone (Continuity Camera) | `system_profiler SPCameraDataType` |
-| V5 | Slack (Electron/Chromium) boşta süresini `CGEventSourceSecondsSinceLastEventType(kCGEventSourceStateCombinedSessionState, kCGAnyInputEventType)` ile ölçer | Chromium `ui/base/idle/idle_mac.mm` |
-| V6 | `IOPMAssertionDeclareUserActivity` başarılı döner (`0x0`) ama ne CGEventSource ne de HIDIdleTime sayacını sıfırlar (5,09 → 5,60 sn) | `tools/probes/idle.swift` (test A) |
-| V7 | Erişilebilirlik izni yokken HID ya da oturum seviyesine gönderilen sentetik `mouseMoved` yalnızca HIDIdleTime'ı sıfırlar (5,69 → 0,50 sn); CGEventSource sayaçlarını sıfırlamaz | `tools/probes/idle.swift` (test B, C) |
+| V5 | Slack (Electron/Chromium) boşta süresini `CGEventSourceSecondsSinceLastEventType(kCGEventSourceStateCombinedSessionState, kCGAnyInputEventType)` ile ölçer. *(Tasarım kararı: bu sayaca dokunulmaz, §1.5.)* | Chromium `ui/base/idle/idle_mac.mm` |
+| V6 | `IOPMAssertionDeclareUserActivity` başarılı döner (`0x0`) ama ne CGEventSource ne de HIDIdleTime sayacını sıfırlar (5,09 → 5,60 sn). Güç bildirimleri boşta kalma sayaçlarından bağımsızdır; §7.6 bu yüzden yalnızca onları kullanır | `tools/probes/idle.swift` (test A) |
+| V7 | Sentetik girdi olayları boşta kalma sayaçlarını sıfırlar (HIDIdleTime 5,69 → 0,50 sn). *(Bu bulgu, sahte etkinlik özelliğinin çıkarılma gerekçesini doğrular: sayaçları kandırmanın tek yolu sahte girdidir; §1.5.)* | `tools/probes/idle.swift` (test B, C) |
 | V8 | SwiftPM + Command Line Tools ile SwiftUI `MenuBarExtra` uygulaması (AVFoundation, Vision, CoreML içeren) derleniyor | `tools/probes/swiftpm-clt` |
 | V9 | Swift Testing, Command Line Tools ile şu bayraklarla çalışıyor: `-Xswiftc -F -Xswiftc <CLT>/Library/Developer/Frameworks`, `-Xswiftc -plugin-path -Xswiftc <CLT>/usr/lib/swift/host/plugins/testing`, `-Xlinker -F -Xlinker <CLT>/Library/Developer/Frameworks`, `-Xlinker -rpath -Xlinker <CLT>/Library/Developer/Frameworks`, `-Xlinker -rpath -Xlinker <CLT>/Library/Developer/usr/lib` (`<CLT>` = `/Library/Developer/CommandLineTools`). Bayraksız `no such module 'Testing'` hatası. XCTest CLT'de yok | `tools/probes/swiftpm-clt` (2/2 test geçti) |
 | V10 | uv + Python 3.12 + torch 2.14.1 + coremltools 9.0 ile PyTorch → Core ML (mlprogram, FP16) dönüşümü; eşitlik kosinüsü 1,0. `MLModel.compileModel` Xcode olmadan çalışma anında derliyor; CPU, GPU ve Neural Engine'de çıkarım çalışıyor | `tools/probes/coreml` |
@@ -662,8 +663,8 @@ Deney betikleri `tools/probes/` altındadır.
 |---|---|---|---|
 | D1 | Kapak açısının hareketle değişmesi, gürültüsü, giriş raporu desteği | Tanılama paneliyle kapağı oynatma | T8 (kamera kayması) |
 | D2 | İvme ekseni ve ölçeği; örnekleme hızını düşürme; güç etkisi | Mac'i eğme ve kaldırma kayıtları | T5'i devre dışı bırakma |
-| D3 | Erişilebilirlik izniyle sentetik olayın Slack'in sayacını (V5) sıfırlaması; Teams'in aktif kalması | İzinli uygulama içinden idle ölçümü; 15 dk gerçek test | Oturum seviyesine gönderim → `flagsChanged` → `IOHIDPostEvent(NX_NULLEVENT)` |
-| D4 | Ekran koruyucu ve ekran uykusunun engellenmesi | Ekran koruyucu 1 dk'ya ayarlıyken nöbet | Etkinlik aralığını kısaltma |
+| D3 | ~~Sahte etkinlikle Slack/Teams sayaçlarını sıfırlama~~ — özellik çıkarıldı (§1.5), doğrulama gereksiz | — | — |
+| D4 | Ekran koruyucu, ekran uykusu ve otomatik kilidin yalnızca güç bildirimleriyle engellenmesi | Ekran koruyucu 1 dk'ya ayarlıyken 15 dk nöbet; `pmset -g assertions` | `caffeinate -d -i` alt süreci |
 | D5 | Kalkan seviyesinin her şeyi örtmesi | §13.4-3 | Pencere seviyesi ve davranış ayarları |
 | D6 | Blur okunamazlığı | §13.4-4 | Koyu ton → `CGSSetWindowBackgroundBlurRadius` |
 | D7 | Girdi engelleme matrisi, secure input, başka süreçlerden gelen olaylar | §13.4-2 | Ek tap seviyesi; kiosk; kalan risk olarak belgeleme |
@@ -690,10 +691,11 @@ Deney betikleri `tools/probes/` altındadır.
 |---|---|
 | Hedef kitle | B — Halil + birkaç arkadaş; dosya olarak paylaşım |
 | Dönüş davranışı | C — ayar; varsayılan "nöbet kapansın" |
-| Ekstralar | "Sen yokken olanlar" raporu ✓ · klavye kısayolu ✓ · fotoğraf ✗ (önce seçildi, sonra kullanıcı kararıyla çıkarıldı) · gerçek macOS kilidi ✗ (yerine yalnızca yüz + uygulama şifresi) · ayrı "uyanık tut" modu ✗ · telefon bildirimi ✗ |
+| Ekstralar | "Sen yokken olanlar" raporu ✓ · klavye kısayolu ✓ · fotoğraf ✗ (önce seçildi, sonra kullanıcı kararıyla çıkarıldı) · gerçek macOS kilidi ✗ (yerine yalnızca yüz + uygulama şifresi) · ayrı "uyanık tut" modu ✗ · sahte etkinlik/"aktif görünme" ✗ (etik gerekçeyle çıkarıldı) · telefon bildirimi ✗ |
 | Yaklaşım | Native Swift + Apple Vision + Core ML yüz tanıma modeli |
 | Blur | Canlı sistem blur'u (ekran kaydı izni istenmez) |
 | Canlılık | Göz kırpma; sıkı mod: rastgele baş hareketi |
 | Uyku sonrası | Her zaman Kilitli |
 | Fiziksel müdahale | Ekran, USB/HID ve şarj kablosu değişiklikleri tetikler |
+| Sahte etkinlik | Yapılmaz: uygulama kullanıcı adına girdi üretmez; yalnızca uyku engellenir (§1.5, §7.6) |
 | Kalite çıtası | En profesyonel çözüm; maliyetten kısılmaz; varsayımla iş yapılmaz; testler yapılır |
