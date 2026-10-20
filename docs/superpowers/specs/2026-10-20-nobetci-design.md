@@ -30,7 +30,7 @@ Nöbetçi, menü çubuğunda çalışan bir macOS uygulamasıdır. Kullanıcı k
 - Dahili kamera, kapak açısı sensörü, ivmeölçer, girdi olayları ve fiziksel bağlantılar izlenir.
 - Sahibin dışında biri görünür ya da herhangi bir müdahale olursa tüm ekranlar anında bulanıklaşır, tüm girdiler kapanır.
 - Kilit yalnızca **sahibin yüzü (canlılık kontrolüyle)** ya da **uygulamaya özel şifre** ile açılır.
-- Sahip döndüğünde "Sen yokken olanlar" raporu fotoğraflarla gösterilir.
+- Sahip döndüğünde "Sen yokken olanlar" raporu gösterilir.
 
 ### 1.3 Hedef kullanıcılar
 Halil ve birkaç arkadaşı (ör. Fatih). Uygulama dosya (DMG) olarak paylaşılır; App Store ve notarization yoktur. Arayüz Türkçedir.
@@ -50,6 +50,7 @@ Halil ve birkaç arkadaşı (ör. Fatih). Uygulama dosya (DMG) olarak paylaşıl
 - Gerçek macOS kilit ekranına geçiş (kullanıcı kararı)
 - Korumadan bağımsız "yalnızca uyanık tut" modu (kullanıcı kararı)
 - Telefona bildirim, otomatik güncelleme, İngilizce arayüz, Intel Mac, birden fazla sahip
+- Fotoğraf çekme (kilit tetiklenince, yanlış şifrede ya da kameraya giren kişilerin) — kullanıcı kararıyla çıkarıldı (2026-10-20)
 
 ---
 
@@ -79,7 +80,7 @@ Kurulum sihirbazı (§8.2): izinler → sistem kontrolleri → yüz kaydı → u
 4. Sahip kalkar; 1,5 sn sonra "sahip yok" durumuna geçilir.
 
 ### 3.3 Sahip yokken biri gelir
-Tetikleyici (§5.3) → kalkan iner, girdiler kapanır, fotoğraf çekilir (ayar açıksa), olay kaydedilir. Kalkan sahip dönene kadar kalır.
+Tetikleyici (§5.3) → kalkan iner, girdiler kapanır, olay kaydedilir. Kalkan sahip dönene kadar kalır.
 
 ### 3.4 Sahip döner
 - **Kilitliyse:** yüz + göz kırpma (ya da şifre) → kalkan kalkar → olay varsa rapor açılır → dönüş davranışına göre nöbet kapanır (varsayılan) ya da sürer (§5.5).
@@ -118,7 +119,7 @@ Kurallar:
 `GuardEngine` saf bir indirgeyicidir: `reduce(state, event, context) -> (newState, [Effect])`.
 
 - **Event:** kare özeti (`FrameSummary`), kamera sağlığı, kapak açısı örneği, ivme özeti, girdi olayı, fiziksel olay, uyku/uyanma, şifre denemesi, kullanıcı komutları (nöbet başlat/kapat), zaman tıkı, açılış.
-- **Effect:** sensörleri başlat/durdur; kalkanı göster/kaldır; girdi politikasını ayarla; uyanık tutmayı aç/kapa; aktif göstermeyi aç/kapa; fotoğraf çek; olay kaydet; bildirim göster; raporu göster; durumu kalıcı yaz.
+- **Effect:** sensörleri başlat/durdur; kalkanı göster/kaldır; girdi politikasını ayarla; uyanık tutmayı aç/kapa; aktif göstermeyi aç/kapa; olay kaydet; bildirim göster; raporu göster; durumu kalıcı yaz.
 - **Context:** ayarlar, enjekte edilen saat, sahip profili meta verisi.
 
 Yan etkileri uygulama katmanındaki `EffectRunner` adaptörlere dağıtır.
@@ -137,8 +138,8 @@ Yan etkileri uygulama katmanındaki `EffectRunner` adaptörlere dağıtır.
  Kapak sensörü ───► örnek (20 Hz) ──────────────────┤
  İvmeölçer ───────► özet olaylar ───────────────────┤
  Girdi filtresi ──► girdi olayı ────────────────────┼──► GuardEngine ──► Effect'ler ──► kalkan · girdi politikası ·
- Ekran/USB/güç ───► fiziksel olay ──────────────────┤                                    uyanık tutma · fotoğraf ·
- Uyku/uyanma · zaman tıkı · komutlar ───────────────┘                                    kayıt · bildirim · durum
+ Ekran/USB/güç ───► fiziksel olay ──────────────────┤                                    uyanık tutma · kayıt ·
+ Uyku/uyanma · zaman tıkı · komutlar ───────────────┘                                    bildirim · durum
 ```
 
 ---
@@ -209,32 +210,17 @@ Yan etkileri uygulama katmanındaki `EffectRunner` adaptörlere dağıtır.
 - Doğrulama PBKDF2 ile yapılır (§9.2).
 - **Yanlış denemeler:** 1–4. denemede bekleme yoktur; 5. yanlış → 30 sn; sonraki her yanlış → bir öncekinin 2 katı (60 sn, 120 sn, …), en fazla 15 dk. Doğru giriş (ya da yüzle açma) sayacı sıfırlar.
 - Sayaç Keychain'de tutulur; uygulama yeniden başlasa da sürer. Bekleme süresi açılış oturumu içinde monoton saatle ölçülür (sistem saatini oynatmaya dayanıklı); Mac yeniden başlarsa o anki bekleme süresi baştan uygulanır.
-- Her yanlış denemede fotoğraf çekilir (ayar açıksa).
 
 ### 5.5 Dönüş davranışı (ayar)
 - **Nöbet kapansın (varsayılan):** Kilit açılınca ya da kilit olmadan sahip ≥ 1,5 sn yokluktan sonra tanınınca → Kapalı. Uyanık tutma ve aktif gösterme biter, kamera kapanır.
 - **Nöbet sürsün:** Kilit açılınca → Nöbette · sahip var. Kamera açık kalır (omuz üstü koruması). Nöbet sahip varken menüden ya da kısayolla kapatılır.
 
-### 5.6 Fotoğraf politikası
-Ayar: "Fotoğraf çek" — **varsayılan açık** (kullanıcı seçimi; kurulumda tek satırlık KVKK notuyla gösterilir).
+### 5.6 Olay kaydı ve rapor
+Her nöbet bir oturum kaydıdır: başlangıç ve bitiş, süre, olaylar (zaman, tür, ayrıntı) ve sayaçlar.
 
-Fotoğraf çekilen durumlar:
-1. **Kilit tetiklendiğinde:** tetik anındaki kare ve (yüz varsa) sonraki 1 sn içindeki en kaliteli yüz karesi.
-2. **Yanlış şifre denemesinde.**
-3. **Sahip yokken kameraya giren herkes** — her boyuttaki yüz ya da gövde izi; mesafe eşiğinin altında kalan, kilidi tetiklemeyen kişiler dahil: iz başladığında ilk 1 sn içindeki en kaliteli kare; iz sürdükçe en fazla 30 sn'de bir.
+Olay türleri: nöbet başladı/bitti; sahip ayrıldı/döndü; tetikleyici (türüyle); kilit açıldı (yüz/şifre); yanlış şifre; sensör ya da kamera sorunu; uygulama yeniden başladı; Mac uyudu/uyandı; nöbet yeniden başlatmayla sonlandı.
 
-Kurallar:
-- Fotoğraflar mevcut kamera akışından alınır (ek yakalama yoktur) ve şifreli saklanır (§9.1).
-- Aynı nöbet içinde yüzü görünen kişiler yüz vektörü benzerliğiyle gruplanır ("Kişi 1", "Kişi 2", …).
-- Nöbet başına üst sınır 200 fotoğraftır; aşılırsa fotoğraf çekilmez ama olaylar kaydedilmeye devam eder.
-- Saklama süresi 7 / **30** / 90 gün; süresi dolanlar otomatik silinir.
-
-### 5.7 Olay kaydı ve rapor
-Her nöbet bir oturum kaydıdır: başlangıç ve bitiş, süre, olaylar (zaman, tür, ayrıntı, fotoğraf kimlikleri, kişi grubu) ve sayaçlar.
-
-Olay türleri: nöbet başladı/bitti; sahip ayrıldı/döndü; kişi göründü; tetikleyici (türüyle); kilit açıldı (yüz/şifre); yanlış şifre; sensör ya da kamera sorunu; uygulama yeniden başladı; Mac uyudu/uyandı; nöbet yeniden başlatmayla sonlandı.
-
-Rapor kuralı: Nöbette kilit, kişi görünmesi, yanlış şifre, müdahale ya da yeniden başlama olduysa rapor penceresi kilit açılınca kendiliğinden açılır. Aksi halde yalnızca "Nöbet bitti — ‹süre›, olay yok" bildirimi gelir.
+Rapor kuralı: Nöbette kilit, yanlış şifre, müdahale ya da yeniden başlama olduysa rapor penceresi kilit açılınca kendiliğinden açılır. Aksi halde yalnızca "Nöbet bitti — ‹süre›, olay yok" bildirimi gelir. Kilidi tetiklemeyen, mesafe eşiğinin altında kalan kişiler rapora yazılmaz.
 
 ---
 
@@ -254,8 +240,8 @@ Tam analiz şu durumlarda çalışır: hareket eşiği aşıldıysa; sahnede ki�
 
 Tam analizdeki istekler:
 - `VNDetectFaceRectanglesRequest`
-- `VNDetectFaceLandmarksRequest` — yüz yüksekliği Uzak mesafe eşiğini geçen tüm yüzler için (daha küçük yüzler yalnızca tespit edilir ve fotoğraflanır)
-- `VNDetectFaceCaptureQualityRequest` — fotoğraf seçimi ve kilit açma için
+- `VNDetectFaceLandmarksRequest` — yüz yüksekliği Uzak mesafe eşiğini geçen tüm yüzler için (daha küçük yüzler yalnızca tespit edilir)
+- `VNDetectFaceCaptureQualityRequest` — kilit açma için
 - `VNDetectHumanRectanglesRequest(upperBodyOnly: true)` — en fazla 5 fps
 - `VNTranslationalImageRegistrationRequest` — en fazla 5 fps, referans kareye göre (T8)
 
@@ -269,9 +255,9 @@ Tam analizdeki istekler:
 - **Skor:** profildeki vektörlere kosinüs benzerliğinin en yüksek 3 değerinin ortalaması.
 - **Üç eşik:** `T_kabul` (ilk tanıma ve kilit açma), `T_sürdür` (doğrulanmış izi sürdürme), `T_red` (kesin yabancı). Seçim kuralları §6.8'dedir.
 
-### 6.5 İz takibi ve kişi gruplama
+### 6.5 İz takibi
 - Ardışık analiz kareleri arasında IoU tabanlı eşleştirme yapılır; kimlik oyları iz üzerinde birikir.
-- Yabancı izlerin vektörleri nöbet içinde `T_kabul` eşiğiyle kümelenir → raporda kişi grupları.
+- Yabancıların yüz vektörleri yalnızca o anki karar için bellekte kullanılır; saklanmaz ve kümelenmez.
 
 ### 6.6 Sahne sağlığı
 Karanlık/örtülü (T6), donma/kesinti (T7) ve kamera kayması (T8) ölçütleri küçültülmüş kareden hesaplanır. Eşikler kayıtlı kliplerle (§13.3) belirlenir ve tanılama panelinde (§13.5) canlı izlenir.
@@ -387,7 +373,7 @@ Carbon `RegisterEventHotKey` (izin gerektirmez). Varsayılan ⌃⌥⌘L; ayarlar
 3. **Sistem kontrolleri:** FileVault, otomatik giriş, Siri sesle tetikleme, Sesli Denetim. Risk varsa açıklamalı uyarı (engellemez).
 4. **Yüz kaydı:** dairesel canlı önizleme; baş çevrilerek halka doldurulur; ışık, netlik ve tek yüz denetimi; isteğe bağlı gözlüklü tur; sonunda doğrulama ("Şimdi seni tanıyabiliyor muyum?").
 5. **Uygulama şifresi:** en az 6 karakter. Tekrar girişi kalkandaki **aynı yakalama yöntemiyle** yapılır; böylece klavye düzeni farkları yüzünden şifrenin kalkanda yazılamaması önlenir.
-6. **Tercihler:** fotoğraf çek (varsayılan açık, KVKK notuyla), dönüş davranışı, kısayol, girişte başlat (varsayılan açık).
+6. **Tercihler:** dönüş davranışı, kısayol, girişte başlat (varsayılan açık).
 7. **Deneme kilidi:** kalkan gerçekten iner, kullanıcı yüzüyle açar.
 
 ### 8.3 Kalkan arayüzü
@@ -399,10 +385,9 @@ Ortada cam efektli bir kart:
 - bir tuşa basınca beliren şifre alanı; yanlış girişte sarsılma animasyonu
 
 ### 8.4 "Sen yokken olanlar" raporu
-- Üst özet: "47 dk · 2 kişi · 1 kilit · 0 yanlış şifre".
-- Zaman çizelgesi: saat, tür simgesi, açıklama, küçük resim (tıklayınca büyür).
-- Kişi gruplarına göre görünüm.
-- Geçmiş nöbetler; seçili fotoğrafları dışa aktarma; tümünü silme.
+- Üst özet: "47 dk · 1 kilit · 3 olay · 0 yanlış şifre".
+- Zaman çizelgesi: saat, tür simgesi, açıklama.
+- Geçmiş nöbetler; geçmişi silme.
 
 ### 8.5 Ayarlar
 
@@ -420,16 +405,15 @@ Ortada cam efektli bir kart:
 | Kilit açma | Sıkı mod | Kapalı |
 | | Yüz profilini yenile / gözlüklü profil ekle | — |
 | | Şifreyi değiştir / Şifremi unuttum | — |
-| Fotoğraflar | Fotoğraf çek | Açık |
-| | Saklama süresi | 30 gün |
-| | Tümünü sil | — |
+| Geçmiş | Nöbet geçmişini saklama süresi | 30 gün |
+| | Geçmişi sil | — |
 | Hakkında | Sürüm, gizlilik açıklaması, tanılama günlüğünü dışa aktar, Nöbetçi'yi kaldır | — |
 
 ### 8.6 Hassas işlemler
 Uygulama şifresi isteyen işlemler:
-- korumayı zayıflatan her ayar: bir tetikleyiciyi kapatmak, hassasiyeti düşürmek (mesafeyi Yakın'a çekmek dahil), fotoğraf çekmeyi kapatmak, sıkı modu kapatmak
+- korumayı zayıflatan her ayar: bir tetikleyiciyi kapatmak, hassasiyeti düşürmek (mesafeyi Yakın'a çekmek dahil), sıkı modu kapatmak
 - yüz profili değişiklikleri ve şifre değişikliği
-- fotoğraf ve raporları görüntüleme, dışa aktarma, silme
+- raporları görüntüleme ve silme
 - Nöbetçi'yi kaldırma
 
 Başarılı bir kilit açma ya da şifre girişinden sonra 5 dk boyunca şifre tekrar sorulmaz. "Şifremi unuttum" yalnızca macOS kimlik doğrulamasıyla çalışır (§3.5).
@@ -450,8 +434,7 @@ Başarılı bir kilit açma ya da şifre girişinden sonra 5 dk boyunca şifre t
 | Veri | Yer | Koruma | Saklama |
 |---|---|---|---|
 | Yüz profili (yalnızca vektörler + model sürümü; ham görüntü yok) | `~/Library/Application Support/Nöbetçi/profile.bin` | AES-GCM-256, anahtar Keychain'de | Silinene ya da yenilenene kadar |
-| Fotoğraflar (HEIC + küçük resim) | `…/Nöbetçi/photos/` | AES-GCM-256 | Ayara göre (varsayılan 30 gün) |
-| Oturum kayıtları | `…/Nöbetçi/sessions/` | AES-GCM-256 | Fotoğraflarla aynı |
+| Oturum kayıtları | `…/Nöbetçi/sessions/` | AES-GCM-256 | Ayara göre (varsayılan 30 gün) |
 | Ayarlar | `…/Nöbetçi/settings.json` | HMAC-SHA256 imzalı; imza bozuksa en güvenli varsayılanlar + uyarı | Kalıcı |
 | Şifre özeti + deneme sayacı | Keychain | `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` | Kalıcı |
 | Şifreleme ve HMAC anahtarları | Keychain | `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, iCloud senkronizasyonu kapalı | Kalıcı |
@@ -508,7 +491,7 @@ Uygulama hiçbir ağ API'si kullanmaz. Kabul testinde nöbet boyunca ağ bağlan
 | Model yüklenemedi | Nöbet başlamaz; "Yeniden kur" önerisi |
 | Keychain erişilemiyor | Nöbet başlamaz |
 | Ayar dosyasının imzası bozuk | En güvenli varsayılanlar + uyarı; olay kaydı |
-| Disk dolu | Fotoğraf atlanır, olay kaydedilir; koruma etkilenmez |
+| Disk dolu | Oturum kaydı yazılamaz; koruma etkilenmez; menüde uyarı |
 | Uygulama çöktü ya da öldürüldü | launchd ≤ 1–2 sn'de yeniden başlatır → Kilitli (T13) |
 | Mac yeniden başladı | Kapalı başlar; açık oturum "yeniden başlatmayla sonlandı" olarak raporlanır |
 | Şifre unutuldu ve yüz tanınmıyor | Kurtarma yolu (§3.5) |
@@ -601,7 +584,7 @@ SemVer. `VERSION` dosyası `CFBundleShortVersionString` ve `CFBundleVersion` de�
 ## 13. Test stratejisi
 
 ### 13.1 Birim testleri (Swift Testing)
-- **Core:** durum makinesinin her geçişi; her tetikleyicinin hem tetiklediği hem tetiklemediği durumlar (sahip var/yok, ayar kapalı); kilit açma koşullarının her birinin tek tek eksik olduğu durumlar; dönüş davranışı; fotoğraf hız sınırı ve kişi gruplama; rapor üretimi; şifre özeti, sabit zamanlı karşılaştırma, bekleme süresi (enjekte saatle); EAR tabanlı kırpma tespiti (sentetik ve kaydedilmiş nokta dizileri); kapak ve ivme eşikleri (kaydedilmiş izler); ayar bütünlüğü.
+- **Core:** durum makinesinin her geçişi; her tetikleyicinin hem tetiklediği hem tetiklemediği durumlar (sahip var/yok, ayar kapalı); kilit açma koşullarının her birinin tek tek eksik olduğu durumlar; dönüş davranışı; rapor üretimi; şifre özeti, sabit zamanlı karşılaştırma, bekleme süresi (enjekte saatle); EAR tabanlı kırpma tespiti (sentetik ve kaydedilmiş nokta dizileri); kapak ve ivme eşikleri (kaydedilmiş izler); ayar bütünlüğü.
 - **Vision:** hizalama dönüşümü (bilinen noktalar → beklenen matris), skor hesabı, iz eşleştirme, sahne sağlığı ölçütleri (sentetik görüntüler).
 - **System:** şifreli depo (yaz/oku/bozulma tespiti), Keychain sarmalayıcısı, ivmeölçer rapor çözümleme, durum dosyası ve açılış oturumu mantığı.
 - **Hedef:** Core'da satır kapsamı ≥ %90 (D19).
@@ -625,7 +608,7 @@ Her madde ölçümüyle birlikte `docs/test-report.md` dosyasına yazılır.
 7. **Aktif gösterme:** 15 dk uzaktayken Slack ve Teams'te durum aktif; ekran koruyucu 1 dk'ya ayarlıyken başlamıyor; ekran kararmıyor.
 8. **Yaşam döngüsü:** `kill -9` → ≤ 2 sn'de kilitli açılış; arka arkaya iki kez; uyku/uyanma; yeniden başlatma → Kapalı başlangıç; elle açma → tek kopya.
 9. **İmza:** yeniden derleyip kurunca izinler korunuyor; başka bir Mac'te (Fatih) "Yine de Aç" akışı.
-10. **Gizlilik:** nöbet boyunca ağ bağlantısı yok (`lsof`); diskte şifresiz yüz ya da fotoğraf verisi yok.
+10. **Gizlilik:** nöbet boyunca ağ bağlantısı yok (`lsof`); diskte şifresiz yüz verisi yok.
 11. **Performans:** §11 bütçeleri (30 dk ölçüm).
 12. **Sürüm uyumu:** Geliştirme Mac'i macOS 26.5'tir; macOS 14/15 uyumu için kabul testlerinin bir alt kümesi Fatih'in Mac'inde koşulur (D21).
 
@@ -670,6 +653,8 @@ Deney betikleri `tools/probes/` altındadır.
 | V12 | FileVault açık; `autoLoginUser` tanımlı değil; ekran kilidi gecikmesi 300 sn | `fdesetup status`, `defaults read`, `sysadminctl -screenLock status` |
 | V13 | Yüklü kod imzalama kimliği yok | `security find-identity -v -p codesigning` |
 | V14 | Siri kapalı (`com.apple.assistant.support` → `Assistant Enabled = 0`). `com.apple.universalaccess` içinde Sesli Denetim izi yok; kesin tespit yöntemi D20'de doğrulanacak | `defaults read` |
+| V15 | Geliştirme Mac'i **Türkçe Q** düzeninde (`com.apple.keylayout.Turkish-QWERTY-PC`). Bu düzende ölü tuşlar (`^`=shift+key20, `~`/`¨`/`´`/`` ` ``=option) ve Option karakterleri (`@`=key12, `€`=key14, `₺`=key17) var. `UCKeyTranslate`, `deadKeyState` taşınarak hepsini doğru üretiyor → şifre yakalama bu API ile yapılacak | `tools/probes/keylayout.swift` |
+| V16 | `swift test --enable-code-coverage` CLT ile çalışıyor; `.build/.../codecov/default.profdata` ve `.xctest` ikilisinden `xcrun llvm-cov report` kapsam raporu üretiyor (`llvm-cov`, `llvm-profdata` CLT'de mevcut) | CLT `llvm-cov` çalıştırması |
 
 ### 15.2 Doğrulanacaklar (uygulama aşamasında)
 
@@ -692,8 +677,8 @@ Deney betikleri `tools/probes/` altındadır.
 | D15 | Performans bütçeleri | §11 | Analiz hızı ve çözünürlük ayarı |
 | D16 | Ağ trafiği olmaması | `lsof` | — (ağ kodu yok) |
 | D17 | Ekran, HID, USB ve güç bildirimlerinin beklendiği gibi gelmesi | Takıp çıkarma testleri | Yoklama (polling) |
-| D18 | Şifre yakalamada Türkçe düzen, Option karakterleri ve ölü tuşlar | §13.4-6 | Kurulumda karakter kısıtı |
-| D19 | `llvm-cov` kod kapsamı aracının CLT'de kullanılabilirliği | `make coverage` | Profil verisini başka bir araçla raporlama |
+| D18 | Şifre yakalamada Türkçe düzen, Option karakterleri ve ölü tuşlar | ~~Ön doğrulama V15'te yapıldı~~ · kalkanda uçtan uca §13.4-6 | Kurulumda karakter kısıtı |
+| D19 | ~~`llvm-cov` kod kapsamı aracının CLT'de kullanılabilirliği~~ → **V16'da doğrulandı** | — | — |
 | D20 | Sesli Denetim'in açık olup olmadığının güvenilir tespiti | Ayarı açıp kapatarak | Kurulumda kullanıcıya sorma |
 | D21 | macOS 14/15 uyumluluğu (geliştirme Mac'i macOS 26.5) | Fatih'in Mac'inde kabul alt kümesi | Gerekirse minimum sürümü yükseltme |
 
@@ -705,7 +690,7 @@ Deney betikleri `tools/probes/` altındadır.
 |---|---|
 | Hedef kitle | B — Halil + birkaç arkadaş; dosya olarak paylaşım |
 | Dönüş davranışı | C — ayar; varsayılan "nöbet kapansın" |
-| Ekstralar | "Sen yokken olanlar" raporu ✓ · fotoğraf ✓ (sahip yokken görünen herkes dahil) · klavye kısayolu ✓ · gerçek macOS kilidi ✗ (yerine yalnızca yüz + uygulama şifresi) · ayrı "uyanık tut" modu ✗ · telefon bildirimi ✗ |
+| Ekstralar | "Sen yokken olanlar" raporu ✓ · klavye kısayolu ✓ · fotoğraf ✗ (önce seçildi, sonra kullanıcı kararıyla çıkarıldı) · gerçek macOS kilidi ✗ (yerine yalnızca yüz + uygulama şifresi) · ayrı "uyanık tut" modu ✗ · telefon bildirimi ✗ |
 | Yaklaşım | Native Swift + Apple Vision + Core ML yüz tanıma modeli |
 | Blur | Canlı sistem blur'u (ekran kaydı izni istenmez) |
 | Canlılık | Göz kırpma; sıkı mod: rastgele baş hareketi |
