@@ -61,6 +61,10 @@ public final class VisionPipeline: @unchecked Sendable {
     private var lastPersonSeen: TimeInterval?
     private var lastFullAnalysis: TimeInterval = -.greatestFiniteMagnitude
     private var previousShiftBuffer: CVPixelBuffer?
+    private var coveredDebounce = CoveredDebouncer()
+    private var ownerTrackID: Int?
+    private var ownerTrackLastSeen: TimeInterval = -.greatestFiniteMagnitude
+    private static let ownerTrackMemory: TimeInterval = 1.5
 
     private let stateLock = NSLock()
     private var _requestedTurn: Turn?
@@ -81,10 +85,13 @@ public final class VisionPipeline: @unchecked Sendable {
 
     public func process(_ pixelBuffer: CVPixelBuffer, now: TimeInterval) -> PipelineOutput {
         let metrics = analyzer.analyze(gray: Self.downsampleGray(pixelBuffer))
-        // T6: örtülü/karanlık — her karede (ucuz). Kilit tetiklenmesi çekirdekte.
-        if scene.isCovered(brightness: Double(metrics.brightness), texture: Double(metrics.texture)) {
+        // T6: örtülü/karanlık — ≥ 0,5 sn sürmeli (spec). Kamera ısınmasındaki siyah kareler
+        // (ölçüldü ~0,3 sn) ve anlık gölgeler sayılmaz; geçici karanlık karede motora özet gönderilmez.
+        let coveredNow = scene.isCovered(brightness: Double(metrics.brightness), texture: Double(metrics.texture))
+        if coveredDebounce.feed(covered: coveredNow, now: now) {
             return PipelineOutput(summary: nil, cameraHealth: .covered)
         }
+        if coveredNow { return PipelineOutput(summary: nil, cameraHealth: nil) }
         let (locked, requestedTurn) = stateLock.withLock { (_locked, _requestedTurn) }
         let needFull = locked || metrics.motionEnergy > 0.02 || (now - lastFullAnalysis) >= 0.5
         guard needFull, let detections = try? detector.detect(in: pixelBuffer) else {
@@ -101,17 +108,29 @@ public final class VisionPipeline: @unchecked Sendable {
         var strangerPresent = false
         var uncertainPresent = false
 
-        for face in detections.faces where face.boundingBox.height >= config.minFaceHeight {
+        // İz sürekliliği: sahibin KENDİ izi kötü açıda belirsiz skor verirse bu bir yabancı
+        // değildir (ölçüldü: kafa çevirince 263 karenin 12'si 0,70 altı). Tehdit yalnızca
+        // FARKLI bir izdir. Sahip izi 1,5 sn hatırlanır; sürdürme eşiği de buna bağlıdır.
+        let ids = tracker.updateAssigning(boxes: detections.faces.map(\.boundingBox), now: now).ids
+        let ownerTrackRecent = ownerTrackID != nil && now - ownerTrackLastSeen <= Self.ownerTrackMemory
+
+        for (i, face) in detections.faces.enumerated() where face.boundingBox.height >= config.minFaceHeight {
+            let isOwnerTrack = ownerTrackRecent && ids[i] == ownerTrackID
             guard face.landmarks5.count == 5,
                   let aligned = alignedFace(pixelBuffer: pixelBuffer, face: face, imageW: w, imageH: h),
                   let vector = try? embedder.embed(aligned) else {
-                uncertainPresent = true
+                if !isOwnerTrack { uncertainPresent = true }
                 continue
             }
-            switch matcher.classify(vector, hasVerifiedTrack: ownerConsecutive >= 3) {
-            case .owner: ownerFace = face
-            case .stranger: strangerPresent = true
-            case .uncertain: uncertainPresent = true
+            switch matcher.classify(vector, hasVerifiedTrack: ownerTrackRecent) {
+            case .owner:
+                ownerFace = face
+                ownerTrackID = ids[i]
+                ownerTrackLastSeen = now
+            case .stranger:
+                if !isOwnerTrack { strangerPresent = true }
+            case .uncertain:
+                if !isOwnerTrack { uncertainPresent = true }
             }
         }
 
@@ -121,7 +140,8 @@ public final class VisionPipeline: @unchecked Sendable {
         if let owner = ownerFace {
             ownerConsecutive += 1
             summary.ownerTrack = OwnerTrackState(recognizedFrameCount: ownerConsecutive, present: true)
-            summary.ownerQualityOK = owner.quality >= 0.3 && owner.boundingBox.height >= PipelineConfig.minFaceHeight(for: .near)
+            // Vision kalite ölçümü gece webcam'de 0,30–0,55 (min 0,295 ölçüldü); 0,25 güvenli taban.
+            summary.ownerQualityOK = owner.quality >= 0.25 && owner.boundingBox.height >= PipelineConfig.minFaceHeight(for: .near)
             let ear = (owner.leftEyeAR + owner.rightEyeAR) / 2
             if blink.feed(ear: ear, now: now) { lastBlink = now }
             if config.strictMode, let turn = requestedTurn {

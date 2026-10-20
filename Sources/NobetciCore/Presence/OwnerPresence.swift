@@ -10,6 +10,7 @@ public struct OwnerPresence: Sendable {
     private var consecutiveOwnerFrames = 0
     private var verified = false
     private var lastOwnerSeen: TimeInterval = -.greatestFiniteMagnitude
+    private var awaitingFirstObservation = false
 
     public init() {}
 
@@ -20,9 +21,16 @@ public struct OwnerPresence: Sendable {
         verified = true
         consecutiveOwnerFrames = Self.framesToVerify
         lastOwnerSeen = now
+        awaitingFirstObservation = true
     }
 
     public mutating func update(match: MatchResult, trackAlive: Bool, now: TimeInterval) -> Presence {
+        if awaitingFirstObservation {
+            // Tohum ile ilk gözlem arasındaki süre (asenkron kamera açılışı, ~1–2 sn) varlığı
+            // eskitmez; zaman aşımı saati ilk gözlemde başlar.
+            awaitingFirstObservation = false
+            lastOwnerSeen = now
+        }
         // Yalnızca sahip karesi "görülme"yi ileri taşır. Kaçırılan/kopan iz ya da
         // yabancı/belirsiz kare doğrulamaya doğru sayımı sıfırlar AMA doğrulamayı
         // anında düşürmez — tek de-doğrulama yolu 1,5 sn'lik zaman aşımıdır (histerezis).

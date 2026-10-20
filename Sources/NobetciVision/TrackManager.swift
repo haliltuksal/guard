@@ -20,6 +20,12 @@ public struct TrackManager {
     public init() {}
 
     public mutating func update(boxes: [CGRect], now: TimeInterval) -> [Track] {
+        updateAssigning(boxes: boxes, now: now).tracks
+    }
+
+    /// Günceller ve her giriş kutusuna atanan iz kimliğini (kutu sırasıyla) döndürür.
+    public mutating func updateAssigning(boxes: [CGRect], now: TimeInterval) -> (tracks: [Track], ids: [Int]) {
+        var ids: [Int] = []
         var matchedTrackIndices = Set<Int>()
         for box in boxes {
             // En iyi IoU'lu, henüz eşleşmemiş izi bul.
@@ -34,15 +40,17 @@ public struct TrackManager {
                 tracks[i].box = box
                 tracks[i].lastSeen = now
                 tracks[i].frameCount += 1
+                ids.append(tracks[i].id)
             } else {
                 tracks.append(Track(id: nextID, box: box, firstSeen: now, lastSeen: now, frameCount: 1))
                 matchedTrackIndices.insert(tracks.count - 1)
+                ids.append(nextID)
                 nextID += 1
             }
         }
         // Süresi dolmuş izleri at.
         tracks.removeAll { now - $0.lastSeen > Self.expiry }
-        return tracks
+        return (tracks, ids)
     }
 
     static func iou(_ a: CGRect, _ b: CGRect) -> CGFloat {

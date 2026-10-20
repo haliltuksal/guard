@@ -33,9 +33,20 @@ import Testing
 @Test func sceneCoveredByDarknessOrDimTextureCollapse() {
     let s = SceneHealthLogic(cameraShiftEnabled: true)
     #expect(s.isCovered(brightness: 0.02, texture: 0.5))    // karanlık → örtülü
-    #expect(s.isCovered(brightness: 0.2, texture: 0.001))   // loş + dokusuz (parmak/bez) → örtülü
-    #expect(!s.isCovered(brightness: 0.5, texture: 0.001))  // parlak düz duvar → ÖRTÜLÜ DEĞİL (yanlış alarm değil)
+    #expect(s.isCovered(brightness: 0.15, texture: 0.005))  // loş + dokusuz (parmak/bez) → örtülü
+    #expect(!s.isCovered(brightness: 0.29, texture: 0.015)) // gece odası, sahip çıkmış düz arka plan → ÖRTÜLÜ DEĞİL (ölçüldü: 0,29/0,04)
+    #expect(!s.isCovered(brightness: 0.5, texture: 0.001))  // parlak düz duvar → ÖRTÜLÜ DEĞİL
     #expect(!s.isCovered(brightness: 0.5, texture: 0.5))
+}
+
+@Test func coveredRequiresHalfSecondPersistence() {
+    // Spec T6: ≥ 0,5 sn süreklilik. Kamera ısınmasındaki birkaç siyah kare (ölçüldü: 9 kare ≈ 0,3 sn) tetiklememeli.
+    var d = CoveredDebouncer()
+    let a = d.feed(covered: true, now: 0.0); #expect(!a)
+    let b = d.feed(covered: true, now: 0.3); #expect(!b)   // ısınma süresi kadar → henüz değil
+    let c = d.feed(covered: true, now: 0.5); #expect(c)    // 0,5 sn sürdü → örtülü
+    let e = d.feed(covered: false, now: 0.6); #expect(!e)  // açıldı → sıfırlanır
+    let f = d.feed(covered: true, now: 0.7); #expect(!f)   // yeniden başlar
 }
 
 @Test func sceneFreezeAndShift() {

@@ -68,6 +68,9 @@ final class LiveProbe: @unchecked Sendable {
     private let scene = SceneHealthLogic(cameraShiftEnabled: false)
     private let minFaceHeight = PipelineConfig.minFaceHeight(for: .medium)
 
+    private var blink = BlinkDetector()
+    private(set) var blinks = 0
+    private(set) var ears: [Float] = []
     private(set) var frames = 0, facesSeen = 0, fiveLandmarks = 0, alignOK = 0, coveredFrames = 0
     private(set) var qualities: [Float] = []
     private(set) var brightness: [Float] = []
@@ -103,7 +106,11 @@ final class LiveProbe: @unchecked Sendable {
             bigFacesPerFrame.append(det.faces.filter { $0.boundingBox.height >= minFaceHeight }.count)
         }
         guard let face = det.faces.max(by: { $0.boundingBox.height < $1.boundingBox.height }) else { return }
-        lock.withLock { facesSeen += 1; qualities.append(face.quality) }
+        let ear = (face.leftEyeAR + face.rightEyeAR) / 2
+        lock.withLock {
+            facesSeen += 1; qualities.append(face.quality); ears.append(ear)
+            if blink.feed(ear: ear, now: SystemClock().now()) { blinks += 1 }   // D13: canlılık kontrolü kanıtı
+        }
         guard face.landmarks5.count == 5 else { return }
         lock.withLock { fiveLandmarks += 1 }
         guard let aligned = FaceCrop.aligned(pixelBuffer: buffer, landmarks: face.landmarks5, context: context),
@@ -159,6 +166,7 @@ camera.stop()
 print("\n=== TESPİT ===")
 print("kare: \(probe.frames)  yüz: \(probe.facesSeen)  5-landmark: \(probe.fiveLandmarks)  hizalama OK: \(probe.alignOK)")
 print("kalite: \(stats(probe.qualities))")
+print("göz kırpma algılandı: \(probe.blinks)   ← 10 sn'de 2–5 bekleniyor (D13 canlılık)   EAR: \(stats(probe.ears))")
 func histogram(_ xs: [Int]) -> String {
     let c = xs.reduce(into: [Int: Int]()) { $0[$1, default: 0] += 1 }
     return c.keys.sorted().map { "\($0) yüz: \(c[$0]!) kare" }.joined(separator: "  ")
