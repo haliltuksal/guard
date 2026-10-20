@@ -33,8 +33,12 @@ CONF
 
 openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
   -config "$TMP/cert.conf" -keyout "$TMP/key.pem" -out "$TMP/cert.pem"
+# macOS'un openssl'i LibreSSL; `-legacy` yoktur. OpenSSL 3 ise eski algoritmalar için
+# `-legacy` ister. Varsa kullan, yoksa kullanma — ikisi de `security import` ile uyumlu.
+P12_LEGACY=""
+if openssl pkcs12 -help 2>&1 | grep -q -- "-legacy"; then P12_LEGACY="-legacy"; fi
 openssl pkcs12 -export -inkey "$TMP/key.pem" -in "$TMP/cert.pem" \
-  -out "$TMP/cert.p12" -passout pass:nobetci -legacy
+  -out "$TMP/cert.p12" -passout pass:nobetci $P12_LEGACY
 
 security import "$TMP/cert.p12" -k "$KC" -P nobetci -T /usr/bin/codesign
 # Güven yalnızca kod imzalamaya ölçeklidir (-p codeSign), genel kök güveni değil.
