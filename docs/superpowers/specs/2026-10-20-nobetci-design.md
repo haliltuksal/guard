@@ -381,6 +381,7 @@ Carbon `RegisterEventHotKey` (izin gerektirmez). Varsayılan ⌃⌥⌘L; ayarlar
 Ortada cam efektli bir kart:
 - kilit simgesi
 - "‹Ad›'ın Mac'i korunuyor" (`NSFullUserName`)
+- "Kamera etkin" satırı (şeffaflık: yaklaşan kişi kameranın açık olduğunu görür)
 - saat ve gün
 - durum metni: "Seni arıyorum…", "Merhaba ‹Ad›, göz kırp", "Sola bak" (sıkı mod), "Yanında biri var — şifre gerekli", "‹n› sn sonra tekrar dene"
 - bir tuşa basınca beliren şifre alanı; yanlış girişte sarsılma animasyonu
