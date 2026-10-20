@@ -20,6 +20,7 @@ let package = Package(
         // first Faz 4 task that writes a test into it.
         .testTarget(name: "NobetciCoreTests", dependencies: ["NobetciCore"]),
         .testTarget(name: "NobetciSystemTests", dependencies: ["NobetciSystem"]),
+        .testTarget(name: "NobetciVisionTests", dependencies: ["NobetciVision"]),
     ],
     swiftLanguageModes: [.v6]
 )
