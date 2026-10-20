@@ -11,7 +11,8 @@ set -euo pipefail
 NAME="Nöbetçi Code Signing"
 KC="$HOME/Library/Keychains/login.keychain-db"
 
-if security find-identity -v -p codesigning | grep -q "$NAME"; then
+# Not: `security` çıktısı Türkçe CN'i mojibake gösterebilir; ASCII alt dize ile eşle.
+if security find-identity -v -p codesigning | grep -q "Code Signing"; then
   echo "zaten var: $NAME"
   exit 0
 fi
@@ -45,4 +46,5 @@ security import "$TMP/cert.p12" -k "$KC" -P nobetci -T /usr/bin/codesign
 security add-trusted-cert -r trustRoot -p codeSign -k "$KC" "$TMP/cert.pem"
 
 echo "oluşturuldu:"
-security find-identity -v -p codesigning | grep "$NAME"
+security find-identity -v -p codesigning | grep "Code Signing" || {
+  echo "UYARI: kimlik oluşturuldu ama listede bulunamadı" >&2; exit 1; }
