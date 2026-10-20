@@ -33,17 +33,25 @@ public final class FaceDetector {
         let h = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
 
         let landmarks = VNDetectFaceLandmarksRequest()
-        let quality = VNDetectFaceCaptureQualityRequest()
         let bodies = VNDetectHumanRectanglesRequest()
         if #available(macOS 12.0, *) { bodies.upperBodyOnly = true }
-        try handler.perform([landmarks, quality, bodies])
+        try handler.perform([landmarks, bodies])
+        let faceObservations = landmarks.results ?? []
 
-        let qualityByBox = (quality.results ?? []).reduce(into: [String: Float]()) { dict, obs in
-            dict[Self.key(obs.boundingBox)] = obs.faceCaptureQuality ?? 0
+        // Kaliteyi AYNI yüz gözlemleri üzerinde hesapla → sonuçlar 1:1 ve sıralı.
+        // (Kutu-dizesiyle eşleştirme iki isteğin kutuları birebir örtüşmediği için ~0 veriyordu.)
+        var qualities = [Float](repeating: 0, count: faceObservations.count)
+        if !faceObservations.isEmpty {
+            let quality = VNDetectFaceCaptureQualityRequest()
+            quality.inputFaceObservations = faceObservations
+            try handler.perform([quality])
+            for (i, obs) in (quality.results ?? []).enumerated() where i < qualities.count {
+                qualities[i] = obs.faceCaptureQuality ?? 0
+            }
         }
 
         var faces: [DetectedFace] = []
-        for obs in landmarks.results ?? [] {
+        for (i, obs) in faceObservations.enumerated() {
             let five = Self.fivePoints(from: obs, imageWidth: w, imageHeight: h)
             let (lAR, rAR) = Self.eyeARs(from: obs)
             faces.append(DetectedFace(
@@ -51,16 +59,12 @@ public final class FaceDetector {
                 landmarks5: five,
                 leftEyeAR: lAR,
                 rightEyeAR: rAR,
-                quality: qualityByBox[Self.key(obs.boundingBox)] ?? 0,
+                quality: qualities[i],
                 yaw: obs.yaw?.floatValue ?? 0,
                 pitch: obs.pitch?.floatValue ?? 0))
         }
         let detectedBodies = (bodies.results ?? []).map { DetectedBody(boundingBox: $0.boundingBox) }
         return Detections(faces: faces, bodies: detectedBodies)
-    }
-
-    private static func key(_ r: CGRect) -> String {
-        String(format: "%.3f,%.3f,%.3f,%.3f", r.origin.x, r.origin.y, r.width, r.height)
     }
 
     /// Vision normalize noktalarını (yüz kutusuna göre, y yukarı) görüntü pikseli (y aşağı) 5 noktaya çevirir.

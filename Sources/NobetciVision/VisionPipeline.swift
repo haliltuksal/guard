@@ -182,7 +182,7 @@ public final class VisionPipeline: @unchecked Sendable {
     }
 
     /// BGRA kareyi 64×36 gri diziye indirger (ucuz metrikler için örnekleme).
-    static func downsampleGray(_ pixelBuffer: CVPixelBuffer) -> [Float] {
+    public static func downsampleGray(_ pixelBuffer: CVPixelBuffer) -> [Float] {
         let outW = 64, outH = 36
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }

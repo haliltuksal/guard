@@ -352,12 +352,12 @@ final class AppModel {
             self.pipeline = builtPipeline
             self.camera = CameraSource(
                 onFrame: { [weak self] buffer, _ in
+                    self?.markFrameArrived()   // VARIŞI işaretle (işleme süresini değil): watchdog kamerayı ölçer
                     // TEK zaman tabanı: motorun saati (mach_continuous). Kamera PTS'i KULLANILMAZ —
                     // o mach_absolute tabanlıdır (uykuda durur); motorun varlık tohumuyla
                     // karışırsa uyumuş bir Mac'te sahip saatlerce "var" sayılır (fail-open).
                     let output = builtPipeline.process(buffer, now: SystemClock().now())
                     guard let self else { return }
-                    self.markFrameArrived()
                     if let summary = output.summary { self.sendFromAnywhere(.frame(summary)) }
                     if let health = output.cameraHealth { self.sendFromAnywhere(.cameraHealth(health)) }
                 },

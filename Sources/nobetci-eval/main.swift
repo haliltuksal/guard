@@ -64,9 +64,17 @@ final class LiveProbe: @unchecked Sendable {
     private let embedder: FaceEmbedder
     private let matcher: FaceMatcher?
     private let context = CIContext()
+    private var analyzer = FrameAnalyzer()
+    private let scene = SceneHealthLogic(cameraShiftEnabled: false)
+    private let minFaceHeight = PipelineConfig.minFaceHeight(for: .medium)
 
-    private(set) var frames = 0, facesSeen = 0, fiveLandmarks = 0, alignOK = 0
+    private(set) var frames = 0, facesSeen = 0, fiveLandmarks = 0, alignOK = 0, coveredFrames = 0
     private(set) var qualities: [Float] = []
+    private(set) var brightness: [Float] = []
+    private(set) var texture: [Float] = []
+    private(set) var facesPerFrame: [Int] = []          // tüm tespitler
+    private(set) var bigFacesPerFrame: [Int] = []       // mesafe eşiğini geçenler (pipeline'ın işlediği)
+    private(set) var maxProcessMs: Double = 0
     private(set) var vectorsAligned: [[Float]] = []
     private(set) var vectorsLoose: [[Float]] = []
     private(set) var scoresVsProfile: [Float] = []
@@ -77,9 +85,24 @@ final class LiveProbe: @unchecked Sendable {
     }
 
     func handle(_ buffer: CVPixelBuffer) {
-        lock.withLock { frames += 1 }
-        guard let det = try? detector.detect(in: buffer),
-              let face = det.faces.max(by: { $0.boundingBox.height < $1.boundingBox.height }) else { return }
+        let started = Date()
+        defer {
+            let ms = Date().timeIntervalSince(started) * 1000
+            lock.withLock { maxProcessMs = max(maxProcessMs, ms) }
+        }
+        let metrics = lock.withLock { analyzer.analyze(gray: VisionPipeline.downsampleGray(buffer)) }
+        let covered = scene.isCovered(brightness: Double(metrics.brightness), texture: Double(metrics.texture))
+        lock.withLock {
+            frames += 1
+            brightness.append(metrics.brightness); texture.append(metrics.texture)
+            if covered { coveredFrames += 1 }
+        }
+        guard let det = try? detector.detect(in: buffer) else { return }
+        lock.withLock {
+            facesPerFrame.append(det.faces.count)
+            bigFacesPerFrame.append(det.faces.filter { $0.boundingBox.height >= minFaceHeight }.count)
+        }
+        guard let face = det.faces.max(by: { $0.boundingBox.height < $1.boundingBox.height }) else { return }
         lock.withLock { facesSeen += 1; qualities.append(face.quality) }
         guard face.landmarks5.count == 5 else { return }
         lock.withLock { fiveLandmarks += 1 }
@@ -136,6 +159,18 @@ camera.stop()
 print("\n=== TESPİT ===")
 print("kare: \(probe.frames)  yüz: \(probe.facesSeen)  5-landmark: \(probe.fiveLandmarks)  hizalama OK: \(probe.alignOK)")
 print("kalite: \(stats(probe.qualities))")
+func histogram(_ xs: [Int]) -> String {
+    let c = xs.reduce(into: [Int: Int]()) { $0[$1, default: 0] += 1 }
+    return c.keys.sorted().map { "\($0) yüz: \(c[$0]!) kare" }.joined(separator: "  ")
+}
+print("kare başı yüz (tüm):      \(histogram(probe.facesPerFrame))")
+print("kare başı yüz (≥ mesafe): \(histogram(probe.bigFacesPerFrame))   ← 2+ ise ikinci yüz T1'i tetikler")
+print("en uzun kare işleme: \(String(format: "%.0f", probe.maxProcessMs)) ms   ← >1000 ise watchdog şüphesi")
+
+print("\n=== SAHNE (T6 örtülü/karanlık) ===")
+print("parlaklık: \(stats(probe.brightness))")
+print("doku:      \(stats(probe.texture))")
+print("örtülü sayılan kare: \(probe.coveredFrames)/\(probe.frames)   ← 0 değilse sahip varken bile T6 kilidi gelir")
 
 print("\n=== KAYITLI PROFİLE KARŞI SKOR (çalışma anındaki hat: FaceCrop) ===")
 print(stats(probe.scoresVsProfile))
