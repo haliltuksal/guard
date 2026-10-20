@@ -296,6 +296,20 @@ final class AppModel {
 
     func stopEnrollment() { enrollment?.stop(); enrollment = nil }
 
+    /// Yüz profilini yeniler (Ayarlar → Kilit açma): yeni kayıt oturumu; tamamlanınca üzerine yazar.
+    func reenrollFace(onProgress: @escaping @Sendable (Int, Int) -> Void,
+                      onComplete: @escaping @Sendable (Bool) -> Void) {
+        runEnrollment(onProgress: onProgress) { [weak self] vectors in
+            Task { @MainActor in
+                guard let self else { onComplete(false); return }
+                self.stopEnrollment()
+                guard !vectors.isEmpty else { onComplete(false); return }
+                do { try self.fileStore.writeEncrypted(vectors, to: "profile.bin"); onComplete(true) }
+                catch { onComplete(false) }
+            }
+        }
+    }
+
     /// Nöbetçi'yi tümüyle kaldırır: launchd kaydı, Keychain kayıtları ve tüm veri.
     func uninstall() {
         try? LaunchAgent.unregister()

@@ -168,15 +168,8 @@ public final class VisionPipeline: @unchecked Sendable {
     }
 
     private func alignedFace(pixelBuffer: CVPixelBuffer, face: DetectedFace, imageW: CGFloat, imageH: CGFloat) -> CGImage? {
-        let size = CGFloat(FaceEmbedder.inputSize)
-        let template = FaceAligner.canonicalTemplate(size: size)
-        let transform = FaceAligner.similarityTransform(from: face.landmarks5, to: template)
-        let ci = CIImage(cvPixelBuffer: pixelBuffer)
-        // Görüntü pikseli (y aşağı) → CIImage (y yukarı) dönüşümü için dikey çevir.
-        let flip = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: imageH)
-        let affine = flip.concatenating(transform).concatenating(CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: size))
-        let transformed = ci.transformed(by: affine)
-        return ciContext.createCGImage(transformed, from: CGRect(x: 0, y: 0, width: size, height: size))
+        // Kayıtla AYNI kesit (FaceCrop); ayrı uygulama profil/canlı uyumsuzluğu yaratmıştı.
+        FaceCrop.aligned(pixelBuffer: pixelBuffer, landmarks: face.landmarks5, context: ciContext)
     }
 
     static func gestureSatisfied(turn: Turn, yaw: Float, pitch: Float) -> Bool {

@@ -14,7 +14,7 @@ let package = Package(
             dependencies: ["NobetciCore", "NobetciVision", "NobetciSystem"],
             resources: [.process("Resources")]
         ),
-        .executableTarget(name: "nobetci-eval", dependencies: ["NobetciCore", "NobetciVision"]),
+        .executableTarget(name: "nobetci-eval", dependencies: ["NobetciCore", "NobetciVision", "NobetciSystem"]),
         // Test targets are declared as each gains its first test file (SwiftPM
         // rejects a target with no sources). NobetciVisionTests is added in the
         // first Faz 4 task that writes a test into it.

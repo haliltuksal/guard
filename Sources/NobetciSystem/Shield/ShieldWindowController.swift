@@ -43,6 +43,10 @@ final class ShieldWindow: NSWindow {
     public var debugWindowLevel: Int { windows.first.map { $0.level.rawValue } ?? -1 }
 
     public func show() {
+        // İdempotent: kilitliyken her kare `.showShield` etkisi gelir; pencereleri her
+        // seferinde yıkıp kurmak titremeye ve gereksiz maliyete yol açar. Mesaj metni
+        // pencerelerden bağımsız olarak (gözlemlenen model) güncellenir.
+        guard !isShowing else { return }
         isShowing = true
         rebuild()
         NSApp?.activate(ignoringOtherApps: true)

@@ -7,6 +7,10 @@ struct SettingsView: View {
     let model: AppModel
     @State private var settings: GuardSettings
     @State private var confirmUninstall = false
+    @State private var reenrolling = false
+    @State private var reenrollCount = 0
+    @State private var reenrollTarget = 50
+    @State private var reenrollDone: Bool?
 
     init(model: AppModel) {
         self.model = model
@@ -55,9 +59,27 @@ struct SettingsView: View {
     private var unlock: some View {
         Form {
             Toggle("Sıkı mod (baş hareketi iste)", isOn: $settings.strictMode)
-            Text("Yüz profilini yenileme ve şifre değiştirme cihazda eklenecek (kimlik doğrulamalı).")
-                .font(.footnote).foregroundStyle(.secondary)
+            Section("Yüz profili") {
+                if reenrolling {
+                    ProgressView(value: Double(reenrollCount), total: Double(reenrollTarget))
+                    Text("\(reenrollCount) / \(reenrollTarget) — kameraya bak, başını yavaşça çevir")
+                        .font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    Button("Yüz profilini yenile") { startReenroll() }
+                    if let done = reenrollDone {
+                        Text(done ? "Profil yenilendi." : "Yenileme başarısız — kamera iznini kontrol et.")
+                            .font(.footnote).foregroundStyle(done ? .green : .red)
+                    }
+                }
+            }
         }.padding()
+    }
+
+    private func startReenroll() {
+        reenrolling = true; reenrollCount = 0; reenrollDone = nil
+        model.reenrollFace(
+            onProgress: { count, total in Task { @MainActor in reenrollCount = count; reenrollTarget = total } },
+            onComplete: { ok in Task { @MainActor in reenrolling = false; reenrollDone = ok } })
     }
 
     private var about: some View {

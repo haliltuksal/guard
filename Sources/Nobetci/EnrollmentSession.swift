@@ -46,10 +46,9 @@ final class EnrollmentSession: @unchecked Sendable {
               let face = detections.faces.max(by: { $0.boundingBox.height < $1.boundingBox.height }),
               face.landmarks5.count == 5 else { return }
 
-        let size = CGFloat(FaceEmbedder.inputSize)
-        let transform = FaceAligner.similarityTransform(from: face.landmarks5, to: FaceAligner.canonicalTemplate(size: size))
-        let ci = CIImage(cvPixelBuffer: buffer).transformed(by: transform)
-        guard let cg = ciContext.createCGImage(ci, from: CGRect(x: 0, y: 0, width: size, height: size)),
+        // Çalışma anıyla AYNI kesit (FaceCrop). Eski kod çevirmesiz dönüştürüyordu →
+        // kayıttaki yüzler yanlış hizalı → sahip canlıda tanınmıyordu (kök neden).
+        guard let cg = FaceCrop.aligned(pixelBuffer: buffer, landmarks: face.landmarks5, context: ciContext),
               let vector = try? embedder.embed(cg) else { return }
 
         lock.lock()
