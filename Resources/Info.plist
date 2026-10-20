@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleName</key><string>Nöbetçi</string>
+  <key>CFBundleDisplayName</key><string>Nöbetçi</string>
+  <key>CFBundleIdentifier</key><string>com.halil.nobetci</string>
+  <key>CFBundleExecutable</key><string>Nobetci</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>__VERSION__</string>
+  <key>CFBundleVersion</key><string>__VERSION__</string>
+  <key>CFBundleIconFile</key><string>Nobetci</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>LSUIElement</key><true/>
+  <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Nöbetçi, sen yokken bilgisayarının başına kimin geçtiğini anlamak için kamerayı kullanır. Görüntüler cihazdan çıkmaz.</string>
+  <key>NSHumanReadableCopyright</key><string>© 2026 Halil Tuksal</string>
+  <key>NSPrincipalClass</key><string>NSApplication</string>
+</dict></plist>
