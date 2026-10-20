@@ -258,6 +258,14 @@ final class AppModel {
 
     func stopEnrollment() { enrollment?.stop(); enrollment = nil }
 
+    /// Nöbetçi'yi tümüyle kaldırır: launchd kaydı, Keychain kayıtları ve tüm veri.
+    func uninstall() {
+        try? LaunchAgent.unregister()
+        for account in ["passcode", "dataKey", "settingsKey"] { try? keychain.delete(account: account) }
+        try? fileStore.removeAll()
+        NSApp.terminate(nil)
+    }
+
     func currentSettings() -> GuardSettings { settings }
 
     func update(_ newSettings: GuardSettings) {

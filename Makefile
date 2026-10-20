@@ -26,6 +26,12 @@ cert: ; ./scripts/make-cert.sh
 
 model: ; ./scripts/build-model.sh
 
+dist: ; ./scripts/dist.sh
+
 eval: ; @echo "LFW eşik kalibrasyonu (D14) Faz 4 hizalama hattı + veri seti gerektirir; bkz docs/model-evaluation.md"
 
 clean: ; rm -rf .build build
+
+install: app
+	rm -rf "/Applications/Nöbetçi.app" && cp -R "build/Nöbetçi.app" /Applications/
+	@echo "kuruldu: /Applications/Nöbetçi.app"

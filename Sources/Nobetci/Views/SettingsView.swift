@@ -6,6 +6,7 @@ import NobetciCore
 struct SettingsView: View {
     let model: AppModel
     @State private var settings: GuardSettings
+    @State private var confirmUninstall = false
 
     init(model: AppModel) {
         self.model = model
@@ -66,6 +67,14 @@ struct SettingsView: View {
             Text("Sürüm \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")")
                 .foregroundStyle(.secondary)
             Text("Hiçbir veri cihazından çıkmaz.").font(.footnote).foregroundStyle(.secondary)
+            Spacer()
+            Button("Nöbetçi'yi kaldır", role: .destructive) { confirmUninstall = true }
+                .confirmationDialog("Nöbetçi kaldırılsın mı?", isPresented: $confirmUninstall) {
+                    Button("Kaldır", role: .destructive) { model.uninstall() }
+                    Button("Vazgeç", role: .cancel) {}
+                } message: {
+                    Text("Yüz profili, şifre ve tüm ayarlar silinir.")
+                }
         }.padding()
     }
 
