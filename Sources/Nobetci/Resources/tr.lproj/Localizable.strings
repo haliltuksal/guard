@@ -78,3 +78,6 @@
 
 /* Profil sürümü */
 "menu.profile.stale" = "Yüz tanıma iyileştirildi — Ayarlar'dan profili yenile";
+
+/* Karanlık */
+"shield.light" = "Karanlık — ekran seni aydınlatıyor";

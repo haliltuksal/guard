@@ -70,6 +70,8 @@ public final class VisionPipeline: @unchecked Sendable {
     /// Sahibin bölgesinde çapayı taşımak için gereken en az kişi-maskesi oranı.
     /// `nobetci-eval presence` çıktısındaki dağılımla kalibre edilir.
     private static let ownerRegionCoverage: Float = 0.20
+    /// Karanlık oda algısı: kamera pozlamasını ve kalite tabanını uyarlar.
+    private var lowLight = LowLightDetector()
 
     private let stateLock = NSLock()
     private var _requestedTurn: Turn?
@@ -81,6 +83,7 @@ public final class VisionPipeline: @unchecked Sendable {
     private var _learningCandidate: [Float]?
     /// Profile eklenmeyi bekleyen vektörler (ana aktörden gelir, kamera kuyruğunda uygulanır).
     private var _pendingProfileAdditions: [[Float]] = []
+    private var _sceneDark = false
 
     public init(detector: FaceDetector, embedder: FaceEmbedder, config: PipelineConfig) {
         self.detector = detector
@@ -106,6 +109,10 @@ public final class VisionPipeline: @unchecked Sendable {
     /// Şifre doğru girildiğinde (kimlik kanıtlandı) profile eklenecek yüz vektörünü alır.
     /// Yalnızca kadrajda TEK ve okunabilir bir yüz varken doldurulur: yanındaki birini
     /// ya da kötü açılı bir kareyi profile yazmasın.
+    /// Oda karanlık mı (süreklilikle doğrulanmış)? Kamera pozlaması ve kalkan aydınlatması
+    /// buna bakar.
+    public var isSceneDark: Bool { stateLock.withLock { _sceneDark } }
+
     /// Öğrenilen vektörü hemen devreye alır (sonraki nöbeti beklemeden).
     public func addProfileVector(_ vector: [Float]) {
         stateLock.withLock { _pendingProfileAdditions.append(vector) }
@@ -124,6 +131,8 @@ public final class VisionPipeline: @unchecked Sendable {
         let additions = stateLock.withLock { defer { _pendingProfileAdditions = [] }; return _pendingProfileAdditions }
         if !additions.isEmpty { matcher = matcher.adding(additions) }
         let metrics = analyzer.analyze(gray: Self.downsampleGray(pixelBuffer))
+        let dark = lowLight.update(brightness: metrics.brightness, now: now)
+        stateLock.withLock { _sceneDark = dark }
         // T6: örtülü/karanlık — ≥ 0,5 sn sürmeli (spec). Kamera ısınmasındaki siyah kareler
         // (ölçüldü ~0,3 sn) ve anlık gölgeler sayılmaz; geçici karanlık karede motora özet gönderilmez.
         let coveredNow = scene.isCovered(brightness: Double(metrics.brightness), texture: Double(metrics.texture))
@@ -256,7 +265,10 @@ public final class VisionPipeline: @unchecked Sendable {
         // Kırpma 100–300 ms sürer; yalnızca eşleşen karelerde dinlenirse kaçar (cihazda yaşandı).
         if let owner = ownerFace ?? ownerTrackFace {
             // Vision kalite ölçümü gece webcam'de 0,30–0,55 (min 0,21 ölçüldü); 0,25 taban.
-            summary.ownerQualityOK = owner.quality >= 0.25 && owner.boundingBox.height >= PipelineConfig.minFaceHeight(for: .near)
+            // Kalite tabanı ışığa göre: karanlıkta Vision'ın kalite ölçümü herkes için düşer,
+            // sabit taban sahibi kilit dışında bırakıyordu (arkadaş geri bildirimi).
+            let floor = QualityFloor.value(brightness: metrics.brightness)
+            summary.ownerQualityOK = owner.quality >= floor && owner.boundingBox.height >= PipelineConfig.minFaceHeight(for: .near)
             let ear = (owner.leftEyeAR + owner.rightEyeAR) / 2
             if blink.feed(ear: ear, now: now) { lastBlink = now }
             if config.strictMode, let turn = requestedTurn {

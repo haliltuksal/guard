@@ -825,3 +825,31 @@ boşluğu kapatamaz: çapa varlığı *sürdürür*, **kuramaz** — kurmak yaln
 sürümle kaydedilmiş profil birebir uyumlu değildir; menüde "Yüz tanıma iyileştirildi —
 Ayarlar'dan profili yenile" uyarısı çıkar. Profil/çalışma-anı uyumsuzluğu bu projede bir kez
 sessizce "hiç tanımıyor" hatasına yol açmıştı; bir daha sessiz kalmıyor.
+
+
+## 21. Karanlık oda — ikinci kullanıcının geri bildirimi (2026-10-21)
+
+İkinci bir kullanıcı loş odada denedi: "buradan beni nasıl tanıyacak", "fotomu çekip
+duruyo". Gönderdiği kare neredeyse zifiri.
+
+**Kök neden (üç ayrı kısıt):**
+1. Kamera pozlaması varsayılan kare süresiyle sınırlı → karanlıkta yüz koyu kalıyor.
+2. `ownerQualityOK` sabit 0,25 tabanıyla ölçülüyordu; Vision'ın yakalama kalitesi
+   karanlıkta **herkes** için düşer, sahip kilit dışında kalıyordu.
+3. Webcam'de kızılötesi aydınlatma yok (Face ID'den farkı): görünür ışık yoksa yüz yok.
+
+**Çözüm:**
+- **Uzun pozlama:** `LowLightDetector` 1,5 sn sürekli karanlık görürse `CameraSource`
+  en uzun kare süresini 1/15 sn'ye çıkarır; otomatik pozlama ışığı daha uzun toplar.
+  macOS'ta webcam için elimizdeki tek gerçek kaldıraç budur (pozlama yanlılığı ve düşük
+  ışık takviyesi iOS'a özel). Işık yanınca anında geri döner.
+- **Uyarlanan kalite tabanı** (`QualityFloor`): karanlıkta 0,12. Eşiğin işi bulanık
+  fotoğrafla kandırmayı zorlaştırmak; karanlıkta saldırganın kesiti de aynı ölçüde kötüdür.
+- **Ekran ışık kaynağı:** kilitliyken oda karanlıksa kalkan geniş, sıcak-beyaz bir zemine
+  döner ve yüzü aydınlatır. İçerik yine gizlidir; kart koyu zemine geçip okunur kalır.
+- (§20'deki pozlama normalleştirme ve şifreyle öğrenme bu sorunun diğer yarısıdır.)
+
+**Kapak tetikleyicisi hakkında:** Aynı kullanıcı "kapağı oynatıyorum, kilitlenmiyor" dedi.
+Bu tasarım gereğidir: kapak/hareket/ekran/USB tetikleyicileri **yalnızca sahip yokken**
+çalışır (spec §5.3). Sen başındayken ekranı eğmen kilit sebebi değildir; aksi hâlde normal
+kullanım sürekli kilitlenirdi. Kullanıcıya bunu anlatmak belgelerin işidir.

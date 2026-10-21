@@ -61,3 +61,21 @@ import Testing
     let s = SceneHealthLogic(cameraShiftEnabled: false)
     #expect(!s.isShifted(translationFraction: 0.5))
 }
+
+// Karanlık oda: kalite tabanı ışığa göre uyarlanır. Vision'ın yakalama kalitesi
+// karanlıkta herkes için düşer; sabit taban sahibi dışarıda bırakıyordu.
+
+@Test func qualityFloorDropsInLowLight() {
+    #expect(QualityFloor.value(brightness: 0.45) == QualityFloor.normal)
+    #expect(QualityFloor.value(brightness: 0.05) == QualityFloor.dark)
+    #expect(QualityFloor.dark < QualityFloor.normal)
+}
+
+@Test func lowLightIsDebouncedSoFlickerDoesNotSwitchModes() {
+    var d = LowLightDetector()                           // mutating: sonuçları önce değişkene al
+    let a = d.update(brightness: 0.05, now: 0); #expect(!a)      // tek kare yetmez
+    let b = d.update(brightness: 0.05, now: 0.5); #expect(!b)
+    let c = d.update(brightness: 0.05, now: 1.6); #expect(c)     // süreklilik → karanlık
+    let e = d.update(brightness: 0.05, now: 2.0); #expect(e)
+    let f = d.update(brightness: 0.50, now: 2.1); #expect(!f)    // ışık yanınca hemen çık
+}

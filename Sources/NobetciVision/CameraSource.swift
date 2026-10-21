@@ -25,6 +25,8 @@ public final class CameraSource: NSObject, @unchecked Sendable {
 
     public private(set) var warnings = Warnings()
     public private(set) var deviceUniqueID: String?
+    private var currentDevice: AVCaptureDevice?
+    private var lowLightOn = false
 
     public init(onFrame: @escaping @Sendable (CVPixelBuffer, TimeInterval) -> Void,
                 onInterruption: @escaping @Sendable () -> Void) {
@@ -43,6 +45,7 @@ public final class CameraSource: NSObject, @unchecked Sendable {
             throw CameraError.noBuiltInCamera
         }
         deviceUniqueID = device.uniqueID
+        currentDevice = device
         disableCenterStageAndDetectEffects(on: device)
 
         let input = try AVCaptureDeviceInput(device: device)
@@ -61,6 +64,25 @@ public final class CameraSource: NSObject, @unchecked Sendable {
                                                name: Notification.Name("AVCaptureSessionWasInterruptedNotification"), object: session)
         NotificationCenter.default.addObserver(self, selector: #selector(interrupted),
                                                name: Notification.Name("AVCaptureSessionRuntimeErrorNotification"), object: session)
+    }
+
+    /// Karanlıkta daha uzun pozlamaya izin verir: en uzun kare süresini 1/15 sn'ye çıkarır,
+    /// böylece otomatik pozlama ışığı daha uzun toplar. macOS'ta webcam için elimizdeki
+    /// tek gerçek kaldıraç budur (pozlama yanlılığı ve düşük ışık takviyesi iOS'a özel).
+    /// Çağrı ucuzdur: durum değişmediyse hiçbir şey yapmaz.
+    public func setLowLight(_ on: Bool) {
+        guard lowLightOn != on, let device = currentDevice else { return }
+        lowLightOn = on
+        guard let range = device.activeFormat.videoSupportedFrameRateRanges.first else { return }
+        let slowest = CMTime(value: 1, timescale: 15)
+        let target = on ? min(slowest, range.maxFrameDuration) : range.maxFrameDuration
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            device.activeVideoMaxFrameDuration = max(target, range.minFrameDuration)
+        } catch {
+            lowLightOn = !on   // ayarlanamadıysa durumu geri al, bir sonraki karede yeniden dene
+        }
     }
 
     public func start() { if !session.isRunning { session.startRunning() } }

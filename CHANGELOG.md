@@ -2,6 +2,16 @@
 
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/), sürümleme [SemVer](https://semver.org/lang/tr/).
 
+## [Yayınlanmamış]
+
+### Düzeltilenler (loş oda — ikinci kullanıcının geri bildirimi)
+- **Uzun pozlama:** oda 1,5 sn sürekli karanlıksa kamera en uzun kare süresi 1/15 sn'ye
+  çıkar; görüntü aydınlanır. Işık yanınca anında geri döner.
+- **Kalite tabanı ışığa uyarlanıyor** (karanlıkta 0,12): Vision'ın kalite ölçümü karanlıkta
+  herkes için düşüyor, sabit taban sahibi kilit dışında bırakıyordu.
+- **Ekran ışık kaynağı:** kilitliyken oda karanlıksa kalkan beyaza döner ve yüzü aydınlatır
+  (webcam'de kızılötesi yoktur; görünür ışık gerekir). İçerik yine gizli kalır.
+
 ## [0.1.3] — 2026-10-21
 
 Yanlış alarmların kökü: sistem artık "yüzünü okuyamıyorum" ile "masadan kalktın"ı

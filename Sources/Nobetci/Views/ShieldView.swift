@@ -10,11 +10,23 @@ struct ShieldView: View {
 
     var body: some View {
         ZStack {
+            // Karanlık odada webcam yüzü göremiyor (kızılötesi yok). Kalkan ışık kaynağı
+            // olur: geniş, sıcak-beyaz bir çerçeve yüzü aydınlatır. İçerik yine gizlidir.
+            if model.shieldNeedsLight {
+                RadialGradient(colors: [Color(white: 1.0), Color(white: 0.92)],
+                               center: .center, startRadius: 0, endRadius: 1400)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
             Color.clear
             VStack(spacing: 16) {
                 Image(systemName: "lock.shield.fill")
                     .font(.system(size: 52, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.95))
+                if model.shieldNeedsLight {
+                    Label(L10n.t("shield.light"), systemImage: "sun.max.fill")
+                        .font(.footnote).foregroundStyle(.white.opacity(0.75))
+                }
                 Text(L10n.t("shield.title", NSFullUserName()))
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(.white)
@@ -39,9 +51,12 @@ struct ShieldView: View {
             }
             .padding(40)
             .frame(maxWidth: 420)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .background(model.shieldNeedsLight ? AnyShapeStyle(Color.black.opacity(0.55))
+                                                : AnyShapeStyle(.ultraThinMaterial),
+                        in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.easeInOut(duration: 0.4), value: model.shieldNeedsLight)
         .onReceive(timer) { now = $0 }
     }
 

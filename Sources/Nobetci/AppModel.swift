@@ -7,6 +7,12 @@ import NobetciSystem
 /// Uygulamanın kompozisyon kökü ve olay döngüsü. Tüm adaptörleri kurar, kamera/
 /// sensör/girdi geri çağırımlarını koordinatöre (GuardEngine) bağlar ve motorun
 /// ürettiği etkileri adaptörlere dağıtır. Görünümler bu @Observable durumu izler.
+/// Kamera geri çağırımı ana aktör dışında çalışır; kameraya oradan erişebilmek için
+/// küçük bir taşıyıcı. Yalnızca kurulumda yazılır, sonra okunur.
+final class CameraBox: @unchecked Sendable {
+    var camera: CameraSource?
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -23,6 +29,8 @@ final class AppModel {
     var photoCount = 0
     /// Yüz profili, güncel kesit hattından daha eski bir sürümle kaydedildi mi?
     var profileNeedsRefresh = false
+    /// Oda karanlık ve kilitliyiz: kalkan ekranı aydınlatıp yüzü görünür kılsın.
+    var shieldNeedsLight = false
 
     struct SensorStatus: Equatable {
         var camera = false, lid = false, accelerometer = false, wakeKeep = false
@@ -491,7 +499,9 @@ final class AppModel {
                                         cameraShiftEnabled: settings.cameraShiftDetection)
             let builtPipeline = VisionPipeline(detector: FaceDetector(), embedder: embedder, config: config)
             self.pipeline = builtPipeline
-            self.camera = CameraSource(
+            // Kamera kendi kare geri çağırımından erişilsin (ana aktör dışı): küçük kutu.
+            let cameraBox = CameraBox()
+            let builtCamera = CameraSource(
                 onFrame: { [weak self] buffer, _ in
                     self?.markFrameArrived()   // VARIŞI işaretle (işleme süresini değil): watchdog kamerayı ölçer
                     // TEK zaman tabanı: motorun saati (mach_continuous). Kamera PTS'i KULLANILMAZ —
@@ -501,8 +511,14 @@ final class AppModel {
                     guard let self else { return }
                     if let summary = output.summary { self.sendFromAnywhere(.frame(summary)) }
                     if let health = output.cameraHealth { self.sendFromAnywhere(.cameraHealth(health)) }
+                    // Karanlıkta: kamerayı uzun pozlamaya al, kalkanı ışık kaynağı yap.
+                    let dark = builtPipeline.isSceneDark
+                    cameraBox.camera?.setLowLight(dark)
+                    Task { @MainActor [weak self] in self?.shieldNeedsLight = dark }
                 },
                 onInterruption: { [weak self] in self?.sendFromAnywhere(.cameraHealth(.lost)) })
+            cameraBox.camera = builtCamera
+            self.camera = builtCamera
             try? self.camera?.configure()
             self.camera?.start()
             self.sensorStatus.camera = true
