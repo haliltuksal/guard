@@ -145,8 +145,10 @@ final class PresenceProbe: @unchecked Sendable {
         let ownerScore: Float?      // en iyi skor (yüz varsa)
         let ownerTrackAlive: Bool   // sahibin yüz izi bu karede de eşleşti mi
         let yaw: Float?
-        let pitch: Float?
+        let pitch: Float?           // landmarks isteğinden
+        let rectPitch: Float?       // VNDetectFaceRectanglesRequest rev3'ten (pitch orada var mı?)
         let quality: Float?
+        let foreshorten: Float?     // göz-ağız / gözler arası: aşağı bakınca küçülür
     }
 
     private let lock = NSLock()
@@ -166,6 +168,28 @@ final class PresenceProbe: @unchecked Sendable {
         self.matcher = matcher
     }
 
+    /// Rev3 dikdörtgen isteği: pitch yalnızca burada dolu olabilir (landmarks'ta nil gelebiliyor).
+    private func rectanglePitch(in buffer: CVPixelBuffer) -> Float? {
+        let handler = VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:])
+        let request = VNDetectFaceRectanglesRequest()
+        request.revision = VNDetectFaceRectanglesRequestRevision3
+        guard (try? handler.perform([request])) != nil,
+              let biggest = (request.results ?? []).max(by: { $0.boundingBox.height < $1.boundingBox.height })
+        else { return nil }
+        return biggest.pitch?.floatValue
+    }
+
+    /// Dikey kısalma: göz ortası–ağız ortası uzaklığının gözler arası uzaklığa oranı.
+    /// Yüz aşağı (ya da yukarı) döndükçe küçülür; pitch yoksa bunun yerine geçer.
+    static func foreshorten(_ p: [CGPoint]) -> Float? {
+        guard p.count == 5 else { return nil }
+        let eyeMid = CGPoint(x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2)
+        let mouthMid = CGPoint(x: (p[3].x + p[4].x) / 2, y: (p[3].y + p[4].y) / 2)
+        let inter = hypot(p[1].x - p[0].x, p[1].y - p[0].y)
+        guard inter > 1 else { return nil }
+        return Float(hypot(mouthMid.x - eyeMid.x, mouthMid.y - eyeMid.y) / inter)
+    }
+
     private func bodies(in buffer: CVPixelBuffer) -> Int {
         let handler = VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:])
         let request = VNDetectHumanRectanglesRequest()
@@ -178,6 +202,7 @@ final class PresenceProbe: @unchecked Sendable {
         let now = SystemClock().now()
         guard let det = try? detector.detect(in: buffer) else { return }
         let bodyCount = bodies(in: buffer)
+        let rectPitch = rectanglePitch(in: buffer)
 
         lock.lock()
         let ids = tracker.updateAssigning(boxes: det.faces.map(\.boundingBox), now: now).ids
@@ -203,73 +228,97 @@ final class PresenceProbe: @unchecked Sendable {
             let face = bestFace ?? det.faces.max(by: { $0.boundingBox.height < $1.boundingBox.height })
             samples.append(Sample(t: now - (t0 ?? now), faces: det.faces.count,
                                   bodies: bodyCount, ownerScore: best, ownerTrackAlive: alive,
-                                  yaw: face?.yaw, pitch: face?.pitch, quality: face?.quality))
+                                  yaw: face?.yaw, pitch: face?.pitch, rectPitch: rectPitch,
+                                  quality: face?.quality,
+                                  foreshorten: face.flatMap { Self.foreshorten($0.landmarks5) }))
         }
     }
 }
 
-func reportPresence(_ samples: [PresenceProbe.Sample], sustain: Float) {
+func reportPresence(_ samples: [PresenceProbe.Sample], thresholds: Thresholds) {
     guard samples.count > 1 else { print("örnek yok"); return }
-    let matched = samples.filter { ($0.ownerScore ?? 0) >= sustain }
+    func pct(_ n: Int, _ d: Int) -> String { d == 0 ? "-" : String(format: "%%%.0f", 100.0 * Double(n) / Double(d)) }
+
+    let sustain = thresholds.sustain, accept = thresholds.accept
+    let aboveSustain = samples.filter { ($0.ownerScore ?? 0) >= sustain }
+    let aboveAccept = samples.filter { ($0.ownerScore ?? 0) >= accept }
     let gapsSamples = samples.filter { ($0.ownerScore ?? 0) < sustain }
     let withBody = gapsSamples.filter { $0.bodies > 0 }
     let withTrack = gapsSamples.filter { $0.ownerTrackAlive }
     let withEither = gapsSamples.filter { $0.bodies > 0 || $0.ownerTrackAlive }
     let nothing = gapsSamples.filter { $0.bodies == 0 && $0.faces == 0 }
 
-    func pct(_ n: Int, _ d: Int) -> String { d == 0 ? "-" : String(format: "%%%.0f", 100.0 * Double(n) / Double(d)) }
-
     print("\n=== VARLIK SÜREKLİLİĞİ ===")
-    print("kare: \(samples.count)   sahip eşleşti (skor ≥ \(sustain)): \(matched.count) (\(pct(matched.count, samples.count)))")
+    print("kare: \(samples.count)")
+    print("skor ≥ kabul  (\(accept)):  \(aboveAccept.count) (\(pct(aboveAccept.count, samples.count)))   ← yeniden tanınma bunu ister")
+    print("skor ≥ sürdürme (\(sustain)): \(aboveSustain.count) (\(pct(aboveSustain.count, samples.count)))   ← iz canlıyken bu yeter")
     print("sahip OKUNMAYAN kare: \(gapsSamples.count)")
-    print("  · gövde görülüyor:        \(withBody.count) (\(pct(withBody.count, gapsSamples.count)))")
-    print("  · yüz izi canlı:          \(withTrack.count) (\(pct(withTrack.count, gapsSamples.count)))")
-    print("  · ikisinden biri:         \(withEither.count) (\(pct(withEither.count, gapsSamples.count)))   ← çapa bu")
-    print("  · hiçbir şey yok:         \(nothing.count) (\(pct(nothing.count, gapsSamples.count)))")
+    print("  · gövde görülüyor:  \(withBody.count) (\(pct(withBody.count, gapsSamples.count)))")
+    print("  · yüz izi canlı:    \(withTrack.count) (\(pct(withTrack.count, gapsSamples.count)))   ← çapanın asıl dayanağı")
+    print("  · ikisinden biri:   \(withEither.count) (\(pct(withEither.count, gapsSamples.count)))")
+    print("  · hiçbir şey yok:   \(nothing.count) (\(pct(nothing.count, gapsSamples.count)))")
 
-    // Kesintiler: sahip okunmayan ardışık diziler.
-    struct Gap { var start: TimeInterval; var end: TimeInterval; var n = 0; var body = 0; var track = 0; var either = 0 }
-    var gaps: [Gap] = []
-    var current: Gap?
-    for s in samples {
-        if (s.ownerScore ?? 0) >= sustain {
-            if let g = current { gaps.append(g); current = nil }
+    // Kesintiler: iki eşik için ayrı ayrı (yeniden tanınma kabul eşiğini ister).
+    struct Gap { var start: TimeInterval; var end: TimeInterval; var n = 0; var body = 0; var track = 0; var scores: [Float] = [] }
+    func gaps(below threshold: Float) -> [Gap] {
+        var out: [Gap] = []
+        var current: Gap?
+        for s in samples {
+            if (s.ownerScore ?? 0) >= threshold {
+                if let g = current { out.append(g); current = nil }
+            } else {
+                var g = current ?? Gap(start: s.t, end: s.t)
+                g.end = s.t; g.n += 1
+                if s.bodies > 0 { g.body += 1 }
+                if s.ownerTrackAlive { g.track += 1 }
+                if let sc = s.ownerScore { g.scores.append(sc) }
+                current = g
+            }
+        }
+        if let g = current { out.append(g) }
+        return out
+    }
+
+    for (label, threshold) in [("sürdürme \(sustain)", sustain), ("kabul \(accept)", accept)] {
+        let gs = gaps(below: threshold).sorted { ($0.end - $0.start) > ($1.end - $1.start) }
+        let long = gs.filter { $0.end - $0.start >= 1.5 }
+        print("\n--- \(label) altı kesintiler: \(gs.count) tane, 1,5 sn'yi aşan: \(long.count)")
+        for g in gs.prefix(5) {
+            let sc = g.scores.isEmpty ? "yüz yok" : String(format: "skor ort %.2f min %.2f", g.scores.reduce(0,+)/Float(g.scores.count), g.scores.min()!)
+            print(String(format: "  %.1f sn (%d kare)  yüz izi %@  gövde %@  %@",
+                         g.end - g.start, g.n, pct(g.track, g.n), pct(g.body, g.n), sc))
+        }
+        if let worst = long.max(by: { ($0.end - $0.start) < ($1.end - $1.start) }) {
+            let covered = pct(worst.track + (worst.body > worst.track ? worst.body - worst.track : 0), worst.n)
+            print(String(format: "  → en uzun yanlış-yokluk %.1f sn; çapa kapsaması %@  %@",
+                         worst.end - worst.start, covered,
+                         worst.track == worst.n ? "(ÇAPA TUTAR)" : "(ÇAPA DELİK VERİR)"))
         } else {
-            var g = current ?? Gap(start: s.t, end: s.t)
-            g.end = s.t; g.n += 1
-            if s.bodies > 0 { g.body += 1 }
-            if s.ownerTrackAlive { g.track += 1 }
-            if s.bodies > 0 || s.ownerTrackAlive { g.either += 1 }
-            current = g
+            print("  → 1,5 sn'yi aşan kesinti yok")
         }
     }
-    if let g = current { gaps.append(g) }
 
-    let long = gaps.filter { $0.end - $0.start >= 1.5 }
-    print("\nkesinti sayısı: \(gaps.count)   1,5 sn'yi aşan: \(long.count)   ← mevcut kodda bunlar \"sahip yok\" demek")
-    for g in gaps.sorted(by: { ($0.end - $0.start) > ($1.end - $1.start) }).prefix(6) {
-        print(String(format: "  %.1f sn  (%d kare)  gövde %@  yüz izi %@  biri %@",
-                     g.end - g.start, g.n, pct(g.body, g.n), pct(g.track, g.n), pct(g.either, g.n)))
+    // Poz: okunabilirlik eşiklerini veriden kalibre etmek için.
+    func poseLine(_ name: String, _ set: [PresenceProbe.Sample]) {
+        let yaw = set.compactMap(\.yaw), pitch = set.compactMap(\.pitch)
+        let rect = set.compactMap(\.rectPitch), q = set.compactMap(\.quality), fs = set.compactMap(\.foreshorten)
+        guard !q.isEmpty else { return }
+        print("\n[\(name)]  n=\(q.count)")
+        print("  yaw            \(stats(yaw))")
+        print("  pitch(landmark)\(stats(pitch))")
+        print("  pitch(rect r3) \(stats(rect))   ← hepsi 0/boşsa pitch bu makinede YOK")
+        print("  kalite         \(stats(q))")
+        print("  kısalma        \(stats(fs))   ← aşağı bakınca düşer; pitch yoksa bunu kullanırız")
     }
-    // Okunabilirlik: sahip okunmayan karelerde yüz hangi açıdaydı?
-    let gapYaw = gapsSamples.compactMap(\.yaw), gapPitch = gapsSamples.compactMap(\.pitch)
-    let gapQ = gapsSamples.compactMap(\.quality)
-    if !gapPitch.isEmpty {
-        print("\n=== OKUNABİLİRLİK (sahip okunmayan karelerde) ===")
-        print("yaw   (rad): \(stats(gapYaw))")
-        print("pitch (rad): \(stats(gapPitch))")
-        print("kalite:      \(stats(gapQ))")
-        let unreadable = zip(zip(gapYaw, gapPitch), gapQ).filter { !FaceReadability.isReadable(yaw: $0.0.0, pitch: $0.0.1, quality: $0.1) }.count
-        print("mevcut eşiklerle \"okunamaz\" sayılan: \(unreadable)/\(gapQ.count) (\(pct(unreadable, gapQ.count)))")
-        print("  ← yüksek olması İYİ: okunamayan yüzden \"yabancı\" kararı çıkmaz")
-    }
-
-    if let worst = long.max(by: { ($0.end - $0.start) < ($1.end - $1.start) }) {
-        print(String(format: "\nen uzun yanlış-yokluk: %.1f sn — bu süre boyunca çapa kapsaması %@",
-                     worst.end - worst.start, pct(worst.either, worst.n)))
-    } else {
-        print("\n1,5 sn'yi aşan kesinti olmadı (bu turda yanlış kilit beklenmez).")
-    }
+    print("\n=== POZ (okunabilirlik kalibrasyonu) ===")
+    poseLine("tanınan kareler", aboveSustain)
+    poseLine("tanınmayan kareler", gapsSamples)
+    let unread = gapsSamples.filter { s in
+        guard let y = s.yaw, let p = s.pitch, let q = s.quality else { return false }
+        return !FaceReadability.isReadable(yaw: y, pitch: p, quality: q)
+    }.count
+    let withFace = gapsSamples.filter { $0.faces > 0 }.count
+    print("\nmevcut eşiklerle \"okunamaz\" sayılan: \(unread)/\(withFace) yüzlü kesinti karesi (\(pct(unread, withFace)))")
 }
 
 func loadStoredProfile() -> [[Float]]? {
@@ -304,14 +353,16 @@ let faceMatcher = profile.map { FaceMatcher(profile: $0, thresholds: thresholds)
 if mode == "presence" {
     let p = PresenceProbe(embedder: embedder, matcher: faceMatcher)
     print("Kayıtlı profil: \(profile.map { "\($0.count) vektör" } ?? "OKUNAMADI")")
-    print("\(Int(seconds)) sn: NORMAL otur ve arada telefonuna bak, burnunu kaşı, başını çevir —")
-    print("yani uygulamanın yanlış kilitlediği hareketleri yap. Masadan KALKMA.")
+    print("\(Int(seconds)) sn — ÖNEMLİ: sorunu birebir tekrarla.")
+    print("  · Süren yarısında telefonunu ALIŞILDIĞI GİBİ TUT ve ona KESİNTİSİZ bak (10+ sn).")
+    print("  · Arada burnunu kaşı, elini yüzüne götür, başını çevir.")
+    print("  · Masadan KALKMA. Amaç: yanlış \"sahip yok\" anını kameraya yakalatmak.")
     let cam = CameraSource(onFrame: { buffer, _ in p.handle(buffer) }, onInterruption: {})
     try cam.configure()
     cam.start()
     try await Task.sleep(for: .seconds(seconds))
     cam.stop()
-    reportPresence(p.samples, sustain: thresholds.sustain)
+    reportPresence(p.samples, thresholds: thresholds)
     exit(0)
 }
 
