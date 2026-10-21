@@ -26,7 +26,8 @@ cert: ; ./scripts/make-cert.sh
 
 model: ; ./scripts/build-model.sh
 
-dist: ; ./scripts/dist.sh
+# app'e bağlı: VERSION değişince eski paketin DMG'ye girmesini önler.
+dist: app ; ./scripts/dist.sh
 
 eval: ; @echo "LFW eşik kalibrasyonu (D14) Faz 4 hizalama hattı + veri seti gerektirir; bkz docs/model-evaluation.md"
 
