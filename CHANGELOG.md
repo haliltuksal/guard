@@ -4,6 +4,14 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/), sürümleme [Se
 
 ## [Yayınlanmamış]
 
+### Düzeltilenler (karanlık oda)
+- **Pozlama normalleştirme:** karanlık odada, arkada parlak ekran varken yüz koyu kalıyor ve
+  gündüz kaydedilmiş profille eşleşmiyordu. Kesit artık gömmeden önce sabit aydınlığa
+  çekiliyor (`ExposureNormalizer`); kayıt ve çalışma anı aynı hattan geçer.
+- **Uyarlanan profil:** şifreyle açtığında o anki yüzün profile eklenir (yeni ışık, gözlük,
+  saç bir kez öğrenilir). Ayrı dosyada, en fazla 20 vektör; "yüz profilini yenile" sıfırlar.
+- Kesit hattı sürümlendi: profil eski sürümle kaydedildiyse menüde yenileme uyarısı çıkar.
+
 ### Düzeltilenler
 - **"Sahne boş sanılması" kökten çözüldü (kişi maskesi).** Yan ekrana bakmak, masada bir
   şeye uzanmak, saçını düzeltmek ya da yüzünü kaşımak yüz dedektörünü susturuyor; yakın

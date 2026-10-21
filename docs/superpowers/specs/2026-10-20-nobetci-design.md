@@ -793,3 +793,35 @@ kadrajdan çıkıp bölgesi boşalınca çapa 1,5 sn içinde ölür.
 
 **Kalibrasyon:** `nobetci-eval presence` çıktısındaki "KİŞİ MASKESİ" bölümü bölge oranının
 dağılımını verir; %20 eşiği bununla doğrulanır.
+
+
+## 20. Karanlıkta tanımama — pozlama ve uyarlanan profil (2026-10-21)
+
+**Belirti:** Karanlık odada, arkada parlak monitör varken sahip tanınmadı; "kadrajda"
+etiketiyle kendi fotoğrafı çekildi (17:16). Önceki iki katmandan farklı: burada yüz
+**görülüyor**, **tanınmıyor**.
+
+**Kök neden:** Kamera pozlaması parlak ekrana göre ayarlanınca yüz koyu kalıyor. Gömme
+vektörü, gündüz kaydedilmiş profille eşleşmiyor (skor sürdürme eşiğinin altında). Çapa bu
+boşluğu kapatamaz: çapa varlığı *sürdürür*, **kuramaz** — kurmak yalnızca tanımayla olur
+(güvenlik gereği).
+
+**Çözüm iki katmanlı:**
+
+1. **Pozlama normalleştirme** (`ExposureNormalizer`): hizalanmış kesit, gömmeden önce sabit
+   bir luma ortalaması (0,45) ve kontrastına (std 0,22) çekilir. Kazanç 4× ile sınırlıdır;
+   düz/karanlık kesitte gürültü yüz gibi görünmesin. `FaceCrop` tek hat olduğu için kayıt,
+   çalışma anı ve değerlendirme aynı işlemden geçer.
+2. **Uyarlanan profil**: şifre doğru girildiğinde kimlik kanıtlanmıştır; o anki yüz vektörü
+   profile eklenir (Face ID'nin yaklaşımı). Böylece yeni ışık, gözlük ya da saç bir kez
+   şifreyle açılınca kalıcı olarak öğrenilir.
+   - Yalnızca kadrajda **tek** ve **okunabilir** yüz varken, kalite ≥ 0,2 ise aday alınır
+     (yanındaki biri ya da kötü açılı kare profile yazılmasın).
+   - Ayrı dosyada (`profile-adaptive.bin`), en fazla 20 vektör (FIFO). Kayıt profili
+     (`profile.bin`) bozulmaz; "yüz profilini yenile" öğrenilenleri sıfırlar.
+   - Öğrenilen vektör sonraki nöbet beklenmeden devreye girer.
+
+**Sessiz uyumsuzluğa karşı:** `FaceCrop.pipelineVersion` eklendi. Ön işleme değişince eski
+sürümle kaydedilmiş profil birebir uyumlu değildir; menüde "Yüz tanıma iyileştirildi —
+Ayarlar'dan profili yenile" uyarısı çıkar. Profil/çalışma-anı uyumsuzluğu bu projede bir kez
+sessizce "hiç tanımıyor" hatasına yol açmıştı; bir daha sessiz kalmıyor.

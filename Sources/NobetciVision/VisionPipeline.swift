@@ -48,7 +48,8 @@ public struct PipelineOutput: Sendable {
 public final class VisionPipeline: @unchecked Sendable {
     private let detector: FaceDetector
     private let embedder: FaceEmbedder
-    private let matcher: FaceMatcher
+    /// Yalnızca kamera kuyruğunda değiştirilir (bekleyen eklemeler kare başında uygulanır).
+    private var matcher: FaceMatcher
     private let scene: SceneHealthLogic
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
@@ -76,6 +77,10 @@ public final class VisionPipeline: @unchecked Sendable {
     private var _capturing = false
     private var _snapshot: Data?          // en son/en kaliteli aday (JPEG)
     private var _snapshotAt: TimeInterval = -.greatestFiniteMagnitude
+    /// Şifreyle kilit açıldığında profile eklenecek aday vektör.
+    private var _learningCandidate: [Float]?
+    /// Profile eklenmeyi bekleyen vektörler (ana aktörden gelir, kamera kuyruğunda uygulanır).
+    private var _pendingProfileAdditions: [[Float]] = []
 
     public init(detector: FaceDetector, embedder: FaceEmbedder, config: PipelineConfig) {
         self.detector = detector
@@ -98,12 +103,26 @@ public final class VisionPipeline: @unchecked Sendable {
         }
     }
 
+    /// Şifre doğru girildiğinde (kimlik kanıtlandı) profile eklenecek yüz vektörünü alır.
+    /// Yalnızca kadrajda TEK ve okunabilir bir yüz varken doldurulur: yanındaki birini
+    /// ya da kötü açılı bir kareyi profile yazmasın.
+    /// Öğrenilen vektörü hemen devreye alır (sonraki nöbeti beklemeden).
+    public func addProfileVector(_ vector: [Float]) {
+        stateLock.withLock { _pendingProfileAdditions.append(vector) }
+    }
+
+    public func consumeLearningCandidate() -> [Float]? {
+        stateLock.withLock { defer { _learningCandidate = nil }; return _learningCandidate }
+    }
+
     /// Bekleyen fotoğrafı alır ve tüketir (motor `captureSnapshot` etkisi verince çağrılır).
     public func consumeSnapshot() -> Data? {
         stateLock.withLock { defer { _snapshot = nil }; return _snapshot }
     }
 
     public func process(_ pixelBuffer: CVPixelBuffer, now: TimeInterval) -> PipelineOutput {
+        let additions = stateLock.withLock { defer { _pendingProfileAdditions = [] }; return _pendingProfileAdditions }
+        if !additions.isEmpty { matcher = matcher.adding(additions) }
         let metrics = analyzer.analyze(gray: Self.downsampleGray(pixelBuffer))
         // T6: örtülü/karanlık — ≥ 0,5 sn sürmeli (spec). Kamera ısınmasındaki siyah kareler
         // (ölçüldü ~0,3 sn) ve anlık gölgeler sayılmaz; geçici karanlık karede motora özet gönderilmez.
@@ -177,6 +196,11 @@ public final class VisionPipeline: @unchecked Sendable {
                 continue
             }
             let score = matcher.score(vector)
+            // Öğrenme adayı: kadrajda tek yüz, okunabilir ve kalitesi yeterli. Şifre doğru
+            // girilirse bu vektör profile eklenir (yeni ışık/gözlük/saç uyumu).
+            if detections.faces.count == 1, readable, face.quality >= 0.2 {
+                stateLock.withLock { _learningCandidate = vector }
+            }
             // Düşük (sürdürme) eşiği YALNIZCA sahibin izindeki yüze uygulanır. Çapa uzun
             // yaşadığı için bunu tüm yüzlere açmak, 0,55–0,70 arası skorlayan bir yabancıyı
             // "sahip" sayardı; başka her yüz kabul eşiğine tabidir.

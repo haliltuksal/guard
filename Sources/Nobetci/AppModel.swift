@@ -21,6 +21,8 @@ final class AppModel {
     var prepareProblems: [String] = []
     /// Menüdeki "Fotoğraflar" satırının sayacı.
     var photoCount = 0
+    /// Yüz profili, güncel kesit hattından daha eski bir sürümle kaydedildi mi?
+    var profileNeedsRefresh = false
 
     struct SensorStatus: Equatable {
         var camera = false, lid = false, accelerometer = false, wakeKeep = false
@@ -59,6 +61,10 @@ final class AppModel {
     /// Galeride aynı anda çözülecek en fazla görüntü (bellek tavanı).
     static let galleryLimit = 200
     static let snapshotPrefix = "snap-"
+    /// Şifreyle açılışta öğrenilen yüz vektörleri (kayıt profili bozulmaz, ayrı dosya).
+    static let adaptiveProfileFile = "profile-adaptive.bin"
+    static let profileVersionFile = "profile-version.bin"
+    static let maxAdaptiveVectors = 20
     static let snapshotIndexFile = "photos-index.bin"
 
     // Seri olay kanalı: tüm kaynaklardan gelen olaylar FIFO sırayla motora ulaşır.
@@ -78,6 +84,8 @@ final class AppModel {
         snapshotIndex = (try? fileStore.readEncrypted(SnapshotIndex.self, from: AppModel.snapshotIndexFile)) ?? SnapshotIndex()
         pruneSnapshots()                     // açılışta süresi geçenleri at (nöbet beklemeden)
         needsSetup = !isEnrolled()
+        let storedVersion = (try? fileStore.readEncrypted(Int.self, from: AppModel.profileVersionFile)) ?? 1
+        profileNeedsRefresh = !needsSetup && storedVersion != FaceCrop.pipelineVersion
         configureAdapters()
         rebuildCoordinator()
         startEventLoop()
@@ -186,7 +194,9 @@ final class AppModel {
         case .setInputPolicy(let p): inputFilter.setPolicy(Self.map(p))
         case .wakeKeep(let on): if on { try? wakeKeeper.start() } else { wakeKeeper.stop() }; sensorStatus.wakeKeep = on
         case .captureSnapshot(let reason): captureSnapshot(reason)
-        case .logEvent(let kind): appendLog(kind)
+        case .logEvent(let kind):
+            appendLog(kind)
+            if kind == .unlockedByPasscode { learnFaceFromPasscodeUnlock() }
         case .notify(let kind): notifier.post(kind)
         case .showSnapshots: showUnseenSnapshots()
         case .showReport(let s):
@@ -365,6 +375,7 @@ final class AppModel {
 
     func enroll(profile: [[Float]], passcode: String) throws {
         try fileStore.writeEncrypted(profile, to: "profile.bin")
+        try? fileStore.writeEncrypted(FaceCrop.pipelineVersion, to: Self.profileVersionFile)
         let salt = AppModel.randomBytes(16)
         let rounds = PasscodeHasher.calibratedRounds(targetSeconds: 0.25, floor: 600_000)   // spec §9.2
         let hash = PasscodeHasher.hash(passcode, salt: salt, rounds: rounds)
@@ -427,7 +438,13 @@ final class AppModel {
                 guard let self else { onComplete(false); return }
                 self.stopEnrollment()
                 guard !vectors.isEmpty else { onComplete(false); return }
-                do { try self.fileStore.writeEncrypted(vectors, to: "profile.bin"); onComplete(true) }
+                do {
+                    try self.fileStore.writeEncrypted(vectors, to: "profile.bin")
+                    self.fileStore.remove(name: AppModel.adaptiveProfileFile)   // yeni kayıt: öğrenilenler sıfırlanır
+                    try self.fileStore.writeEncrypted(FaceCrop.pipelineVersion, to: AppModel.profileVersionFile)
+                    self.profileNeedsRefresh = false
+                    onComplete(true)
+                }
                 catch { onComplete(false) }
             }
         }
@@ -462,7 +479,7 @@ final class AppModel {
 
     private func buildPipelineAndCamera() {
         guard pipeline == nil,
-              let profile = try? fileStore.readEncrypted([[Float]].self, from: "profile.bin"),
+              let profile = loadMergedProfile(),
               let packageURL = Bundle.main.url(forResource: "Model", withExtension: "mlpackage") else { return }
         Task { @MainActor in
             guard let embedder = try? await FaceEmbedder.load(packageURL: packageURL,
@@ -490,6 +507,27 @@ final class AppModel {
             self.camera?.start()
             self.sensorStatus.camera = true
         }
+    }
+
+    /// Kayıt profili + şifreyle açılışta öğrenilenler. Öğrenilenler ayrı dosyada tutulur:
+    /// "yüz profilini yenile" dediğinde kayıt temiz kalsın, öğrenilenler sıfırlansın.
+    private func loadMergedProfile() -> [[Float]]? {
+        guard let base = try? fileStore.readEncrypted([[Float]].self, from: "profile.bin") else { return nil }
+        let adaptive = (try? fileStore.readEncrypted([[Float]].self, from: Self.adaptiveProfileFile)) ?? []
+        return base + adaptive
+    }
+
+    /// Şifre doğru girildi: kimlik kanıtlandı. O anki yüz (yeni ışık, gözlük, saç) profile
+    /// eklenir — bir daha aynı koşulda tanınmamak yerine öğrenir (Face ID'nin yaklaşımı).
+    private func learnFaceFromPasscodeUnlock() {
+        guard let vector = pipeline?.consumeLearningCandidate() else { return }
+        var adaptive = (try? fileStore.readEncrypted([[Float]].self, from: Self.adaptiveProfileFile)) ?? []
+        adaptive.append(vector)
+        if adaptive.count > Self.maxAdaptiveVectors {
+            adaptive.removeFirst(adaptive.count - Self.maxAdaptiveVectors)   // en eskisi düşer
+        }
+        try? fileStore.writeEncrypted(adaptive, to: Self.adaptiveProfileFile)
+        pipeline?.addProfileVector(vector)      // sonraki nöbeti bekleme, hemen geçerli olsun
     }
 
     // MARK: Yardımcılar

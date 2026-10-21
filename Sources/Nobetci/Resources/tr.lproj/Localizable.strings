@@ -75,3 +75,6 @@
 "photos.close.zoom" = "Kapat";
 "photos.zoom.hint" = "Büyütmek için tıkla";
 "report.photos" = "Kimler yaklaştı (%@)";
+
+/* Profil sürümü */
+"menu.profile.stale" = "Yüz tanıma iyileştirildi — Ayarlar'dan profili yenile";

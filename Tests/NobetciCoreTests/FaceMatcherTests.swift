@@ -46,3 +46,12 @@ private let th = Thresholds(accept: 0.5, sustain: 0.4, reject: 0.3)
     #expect(m.classify(score: 0.60, hasVerifiedTrack: true) == .owner)       // sahip izi
     #expect(m.classify(score: 0.60, hasVerifiedTrack: false) == .uncertain)  // başka iz
 }
+
+@Test func addingGrowsTheProfileWithoutTouchingThresholds() {
+    // Şifreyle açılışta öğrenilen vektör profile katılır; eşikler değişmez.
+    let m = FaceMatcher(profile: [[1, 0, 0]], thresholds: Thresholds(accept: 0.70, sustain: 0.55, reject: 0.40))
+    let grown = m.adding([[0, 1, 0]])
+    #expect(m.profileSize == 1 && grown.profileSize == 2)
+    #expect(grown.thresholds == m.thresholds)
+    #expect(grown.score([0, 1, 0]) > m.score([0, 1, 0]))   // yeni görünüm artık tanınıyor
+}

@@ -7,6 +7,12 @@ import CoreVideo
 /// bunu kullanır. Bunun iki ayrı uygulaması profil ile canlı yüz arasında geometrik
 /// uyumsuzluk yaratmış, sahip tanınmaz olmuştu — bir daha ayrışmasın.
 public enum FaceCrop {
+    /// Kesit hattının sürümü. Ön işleme değişince (ör. pozlama normalleştirme eklenince)
+    /// artar; eski sürümle kaydedilmiş profil artık birebir uyumlu değildir, kullanıcıdan
+    /// yüz profilini yenilemesi istenir. Sessiz uyumsuzluk bir kez "tanımıyor" hatasına
+    /// yol açmıştı; bir daha sessiz kalmasın.
+    public static let pipelineVersion = 2
+
     /// CIImage (y-yukarı) uzayında uygulanacak bileşik dönüşüm:
     /// CI → piksel (çevir) → benzerlik (landmark→şablon, y-aşağı) → çıktı CI (çevir).
     public static func ciTransform(landmarks: [CGPoint], imageHeight: CGFloat, outputSize: CGFloat) -> CGAffineTransform {
@@ -24,6 +30,11 @@ public enum FaceCrop {
         let imageHeight = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
         let transform = ciTransform(landmarks: landmarks, imageHeight: imageHeight, outputSize: outputSize)
         let image = CIImage(cvPixelBuffer: pixelBuffer).transformed(by: transform)
-        return context.createCGImage(image, from: CGRect(x: 0, y: 0, width: outputSize, height: outputSize))
+        guard let crop = context.createCGImage(image, from: CGRect(x: 0, y: 0, width: outputSize, height: outputSize))
+        else { return nil }
+        // Pozlama normalleştirme: karanlık oda / arkadan ışık yüzü koyu bırakıyor ve
+        // gündüz kaydedilmiş profille eşleşmiyordu. Kayıt ve çalışma anı aynı hattan
+        // geçtiği için profil ile canlı yüz tutarlı kalır.
+        return ExposureNormalizer.normalized(crop) ?? crop
     }
 }

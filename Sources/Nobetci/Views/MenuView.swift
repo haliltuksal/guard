@@ -28,6 +28,11 @@ struct MenuView: View {
             .buttonStyle(.borderedProminent)
             .disabled(isBusy)
 
+            if model.profileNeedsRefresh {
+                Label(L10n.t("menu.profile.stale"), systemImage: "person.crop.circle.badge.exclamationmark")
+                    .font(.footnote).foregroundStyle(.orange)
+            }
+
             if case .guarding = model.state { sensorRow }
 
             Divider()

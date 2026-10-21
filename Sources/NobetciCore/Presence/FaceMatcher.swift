@@ -25,6 +25,14 @@ public struct FaceMatcher: Sendable {
         self.thresholds = thresholds
     }
 
+    public var profileSize: Int { profile.count }
+
+    /// Profile yeni vektörler eklenmiş bir kopya. Şifre doğru girildiğinde (kimlik
+    /// kanıtlanmıştır) o anki ışık/görünüm profile katılır — Face ID'nin yaptığı gibi.
+    public func adding(_ vectors: [[Float]]) -> FaceMatcher {
+        FaceMatcher(profile: profile + vectors, thresholds: thresholds)
+    }
+
     /// Profildeki vektörlere kosinüs benzerliğinin en yüksek 3'ünün ortalaması.
     public func score(_ v: [Float]) -> Float {
         guard !profile.isEmpty else { return 0 }
