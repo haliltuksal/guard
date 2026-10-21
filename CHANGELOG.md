@@ -2,6 +2,19 @@
 
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/), sürümleme [SemVer](https://semver.org/lang/tr/).
 
+## [Yayınlanmamış]
+
+### Düzeltilenler
+- **"Sahne boş sanılması" kökten çözüldü (kişi maskesi).** Yan ekrana bakmak, masada bir
+  şeye uzanmak, saçını düzeltmek ya da yüzünü kaşımak yüz dedektörünü susturuyor; yakın
+  mesafede gövde dedektörü de hiç tetiklenmiyor (ölçüldü: %0). Sistem sahneyi boş sanıp
+  kilitliyor, sahibi fotoğraflıyor ve elin hareketini "kamera oynatıldı" okuyordu.
+  Artık `VNGeneratePersonSegmentationRequest` ile sahibin bölgesinde kişi aranıyor.
+  Ayrıntı: spec §19.
+- Masada bir şeye uzanırken iz kutusu kayıyordu: kadrajda tek yüz varsa o yüz sahibin
+  devamı sayılıyor (tanıma yerine geçmez).
+- Çapa canlıyken "kamera kaydı" (T8) tetiklenmiyor.
+
 ## [0.1.2] — 2026-10-21
 
 Tek bir kök nedenin çözümü: yüzün okunamadığı anlarda artık "masadan kalktın" sayılmıyor.

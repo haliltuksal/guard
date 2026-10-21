@@ -66,6 +66,9 @@ public final class VisionPipeline: @unchecked Sendable {
     private var threats = ThreatTracker()
     /// Sahip kimliğinin çapası (bkz `OwnerAnchor`): tanıma kaybolsa da iz sürdükçe sahip oradadır.
     private var anchor = OwnerAnchor()
+    /// Sahibin bölgesinde çapayı taşımak için gereken en az kişi-maskesi oranı.
+    /// `nobetci-eval presence` çıktısındaki dağılımla kalibre edilir.
+    private static let ownerRegionCoverage: Float = 0.20
 
     private let stateLock = NSLock()
     private var _requestedTurn: Turn?
@@ -114,7 +117,9 @@ public final class VisionPipeline: @unchecked Sendable {
         // sahnenin durgunluğuna bağlı kalmasın. Kimse yokken 0,5 sn'de bir (pil).
         let personRecently = lastPersonSeen.map { now - $0 <= 1.0 } ?? false
         let needFull = locked || personRecently || metrics.motionEnergy > 0.02 || (now - lastFullAnalysis) >= 0.5
-        guard needFull, let detections = try? detector.detect(in: pixelBuffer) else {
+        // Maske yalnızca taşınacak bir çapa varken: sahip gerçekten yokken bedeli sıfır.
+        let needsMask = anchor.isAlive(now: now)
+        guard needFull, let detections = try? detector.detect(in: pixelBuffer, needsPersonMask: needsMask) else {
             return PipelineOutput(summary: nil, cameraHealth: nil)   // skip: motora kare gönderme
         }
         lastFullAnalysis = now
@@ -143,6 +148,9 @@ public final class VisionPipeline: @unchecked Sendable {
             } else if let i = detections.faces.firstIndex(where: { anchor.canRebind(to: $0.boundingBox, now: now) }) {
                 anchor.rebind(trackID: ids[i], box: detections.faces[i].boundingBox, now: now)
                 ownerIndex = i
+            } else if anchor.canAdoptSoleFace(faceCount: detections.faces.count, now: now) {
+                anchor.rebind(trackID: ids[0], box: detections.faces[0].boundingBox, now: now)
+                ownerIndex = 0
             }
         }
         let anchoredAtStart = anchor.isAlive(now: now)   // eşik histerezisi kare boyunca sabit
@@ -201,8 +209,14 @@ public final class VisionPipeline: @unchecked Sendable {
             }
         }
 
-        // Yüz hiç görünmüyor ama kadrajda biri var: sahne boşalmadıysa çapayı taşı.
-        if detections.faces.isEmpty, !detections.bodies.isEmpty { anchor.carry(now: now) }
+        // Yüz hiç görünmüyor: sahibin DURDUĞU YERDE hâlâ biri var mı? Gövde dedektörü
+        // yakın mesafede susuyor (ölçüldü), bu yüzden asıl dayanak kişi maskesi. Bölgeyle
+        // sınırlı bakılır: sandalyedeki mont ya da arkadan geçen biri çapayı yaşatmasın.
+        if detections.faces.isEmpty {
+            let region = PersonMask.ownerRegion(faceBox: anchor.box)
+            let covered = detections.personMask.map { $0.coverage(in: region) >= Self.ownerRegionCoverage } ?? false
+            if covered || !detections.bodies.isEmpty { anchor.carry(now: now) }
+        }
         let anchored = anchor.isAlive(now: now)
 
         let bodyPresent = detections.bodies.contains { $0.boundingBox.height >= config.minBodyHeight }
@@ -242,8 +256,10 @@ public final class VisionPipeline: @unchecked Sendable {
         summary.sceneEmptyFor = sceneEmptyDuration(now: now, anyPerson: anyPerson)
 
         // T8: kişi yokken kamera açısı/konumu kaydı (kapak sensörü olmayan Mac yedeği).
+        // Çapa canlıyken kadrajdaki değişim sahibin kendi hareketidir (el, saç düzeltme):
+        // "kamera oynatıldı" sanılıp kilitlenmesin (cihazda yaşandı, 17:05).
         var health: CameraHealth?
-        if !anyPerson {
+        if !anyPerson, !anchored {
             if let prev = previousShiftBuffer, isShifted(from: prev, to: pixelBuffer, width: w) { health = .shifted }
             previousShiftBuffer = pixelBuffer
         } else {

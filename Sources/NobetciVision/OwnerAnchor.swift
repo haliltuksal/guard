@@ -62,6 +62,14 @@ public struct OwnerAnchor: Sendable, Equatable {
         return TrackManager.iou(box, candidate) >= Self.rebindIoU
     }
 
+    /// Kadrajda tek yüz varken, kutu çok kaymış olsa da (masada bir şeye uzanmak, öne
+    /// eğilmek) o yüz sahibin devamı sayılabilir: rakip aday yok ve sahne boşalmadı.
+    /// Tanıma yerine geçmez — yalnızca varlığı sürdürür; okunabilir bir yabancı yüz
+    /// yine de çapayı düşürür (bkz `VisionPipeline`).
+    public func canAdoptSoleFace(faceCount: Int, now: TimeInterval) -> Bool {
+        trackID != nil && faceCount == 1 && now - lastSeen <= Self.rebindWindow
+    }
+
     /// Kopan izi yeni iz kimliğiyle devam ettir (tanıma şartı yok; konum sürekliliği kanıt).
     public mutating func rebind(trackID id: Int, box b: CGRect, now: TimeInterval) {
         guard trackID != nil else { return }

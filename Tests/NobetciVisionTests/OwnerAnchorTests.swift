@@ -92,3 +92,15 @@ private let box = CGRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2)
     #expect(!FaceReadability.isReadable(yaw: 1.0, pitch: 0.0, quality: 0.5))    // profil
     #expect(!FaceReadability.isReadable(yaw: 0.0, pitch: 0.0, quality: 0.05))   // bulanık/karanlık
 }
+
+@Test func soleFaceIsAdoptedWhenAnchorIsAliveAndThereIsNoCompetitor() {
+    // Masada bir şeye uzanırken kutu çok kayar; IoU tutmaz ama kadrajda tek yüz var
+    // ve sahne hiç boşalmadı → bu yüz sahibin devamıdır (tanıma yine de gerekir).
+    var a = OwnerAnchor()
+    a.verify(trackID: 7, box: box, now: 0)
+    let faraway = CGRect(x: 0.05, y: 0.1, width: 0.2, height: 0.2)
+    #expect(!a.canRebind(to: faraway, now: 0.8))              // örtüşme yok
+    #expect(a.canAdoptSoleFace(faceCount: 1, now: 0.8))       // ama tek aday
+    #expect(!a.canAdoptSoleFace(faceCount: 2, now: 0.8))      // ikinci yüz varsa hayır
+    #expect(!a.canAdoptSoleFace(faceCount: 1, now: 9.0))      // pencere kapandıysa hayır
+}

@@ -4,6 +4,10 @@
 //                                 Kayıtlı profile karşı skorlar + öz-benzerlik dağılımı.
 //                                 Kök neden ve eşik kalibrasyonu için kanıt üretir.
 //
+//   nobetci-eval snaps           Kaydedilmiş yanlış-alarm karelerini çözer ve ölçer:
+//                                 yüz / gövde / kişi maskesi hangisi görüyor? Hatanın
+//                                 kendi karesi üzerinde kanıt üretir (kamera gerekmez).
+//
 //   nobetci-eval presence [sn]   Varlık sürekliliği: sahip okunmadığı anlarda gövde ve
 //                                 yüz izi hâlâ görülüyor mu? Yanlış "sahip yok" kararının
 //                                 (telefona bakma, burun kaşıma) kanıtını üretir.
@@ -13,6 +17,7 @@
 import AVFoundation
 import Vision
 import CoreImage
+import ImageIO
 import CryptoKit
 import Foundation
 import NobetciCore
@@ -149,6 +154,8 @@ final class PresenceProbe: @unchecked Sendable {
         let rectPitch: Float?       // VNDetectFaceRectanglesRequest rev3'ten (pitch orada var mı?)
         let quality: Float?
         let foreshorten: Float?     // göz-ağız / gözler arası: aşağı bakınca küçülür
+        let maskTotal: Float?       // yüz yokken: karedeki kişi oranı
+        let maskRegion: Float?      // yüz yokken: sahibin bölgesindeki kişi oranı
     }
 
     private let lock = NSLock()
@@ -160,6 +167,7 @@ final class PresenceProbe: @unchecked Sendable {
     private let minBodyHeight: CGFloat = 0.20
     private var tracker = TrackManager()
     private var ownerTrackID: Int?
+    private var lastOwnerBox: CGRect = CGRect(x: 0.3, y: 0.2, width: 0.4, height: 0.5)
     private(set) var samples: [Sample] = []
     private var t0: TimeInterval?
 
@@ -220,8 +228,16 @@ final class PresenceProbe: @unchecked Sendable {
             if best == nil || score > best! { best = score; bestIndex = i; bestFace = face }
         }
 
+        // Yüz yokken kişi maskesi (üretimdeki yolun aynısı).
+        var maskTotal: Float?, maskRegion: Float?
+        if det.faces.isEmpty, let mask = det.personMask {
+            maskTotal = mask.total
+            maskRegion = mask.coverage(in: PersonMask.ownerRegion(faceBox: lock.withLock { lastOwnerBox }))
+        }
+
         lock.withLock {
             if let b = best, b >= 0.70, let i = bestIndex { ownerTrackID = ids[i] }
+            if let i = bestIndex { lastOwnerBox = det.faces[i].boundingBox }
             let alive = ownerID != nil && ids.contains(ownerID!)
             if t0 == nil { t0 = now }
             // Poz/kalite: yüz varsa en büyük yüzünkini de kaydet (okunabilirlik kalibrasyonu).
@@ -230,7 +246,8 @@ final class PresenceProbe: @unchecked Sendable {
                                   bodies: bodyCount, ownerScore: best, ownerTrackAlive: alive,
                                   yaw: face?.yaw, pitch: face?.pitch, rectPitch: rectPitch,
                                   quality: face?.quality,
-                                  foreshorten: face.flatMap { Self.foreshorten($0.landmarks5) }))
+                                  foreshorten: face.flatMap { Self.foreshorten($0.landmarks5) },
+                                  maskTotal: maskTotal, maskRegion: maskRegion))
         }
     }
 }
@@ -318,7 +335,110 @@ func reportPresence(_ samples: [PresenceProbe.Sample], thresholds: Thresholds) {
         return !FaceReadability.isReadable(yaw: y, pitch: p, quality: q)
     }.count
     let withFace = gapsSamples.filter { $0.faces > 0 }.count
+    // Kişi maskesi: yüz de gövde de yokken çapayı taşıyacak sinyal.
+    let faceless = samples.filter { $0.faces == 0 }
+    let masked = faceless.compactMap(\.maskRegion)
+    if !masked.isEmpty {
+        let carried = masked.filter { $0 >= 0.20 }.count
+        print("\n=== KİŞİ MASKESİ (yüz bulunamayan kareler) ===")
+        print("yüzsüz kare: \(faceless.count)   maske hesaplanan: \(masked.count)")
+        print("sahibin bölgesinde kişi oranı: \(stats(masked))")
+        print("kare genelinde:               \(stats(faceless.compactMap(\.maskTotal)))")
+        print("0,20 eşiğini geçen (çapa taşınır): \(carried)/\(masked.count) (\(pct(carried, masked.count)))")
+        print("  ← yüksek olması İYİ: yüz görünmezken bile 'sahip masada' denir")
+    }
+
     print("\nmevcut eşiklerle \"okunamaz\" sayılan: \(unread)/\(withFace) yüzlü kesinti karesi (\(pct(unread, withFace)))")
+}
+
+
+// MARK: Kaydedilmiş karelerin ölçümü (yanlış alarmın kendi görüntüsü)
+
+/// Kişi maskesi: yüz/gövde dedektörü yakın çekimde profil yüzü kaçırınca
+/// "kadrajda insan var mı" sorusunu yöne bağlı olmadan yanıtlar.
+func personCoverage(_ handler: VNImageRequestHandler) -> Float? {
+    let request = VNGeneratePersonSegmentationRequest()
+    request.qualityLevel = .fast
+    request.outputPixelFormat = kCVPixelFormatType_OneComponent8
+    guard (try? handler.perform([request])) != nil,
+          let mask = request.results?.first?.pixelBuffer else { return nil }
+    CVPixelBufferLockBaseAddress(mask, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(mask, .readOnly) }
+    guard let base = CVPixelBufferGetBaseAddress(mask) else { return nil }
+    let w = CVPixelBufferGetWidth(mask), h = CVPixelBufferGetHeight(mask)
+    let stride = CVPixelBufferGetBytesPerRow(mask)
+    let p = base.assumingMemoryBound(to: UInt8.self)
+    var on = 0
+    for y in 0..<h { for x in 0..<w where p[y * stride + x] > 128 { on += 1 } }
+    return Float(on) / Float(max(w * h, 1))
+}
+
+/// CGImage → CVPixelBuffer: ölçüm, üretimdeki hattın aynısını kullansın diye.
+func pixelBuffer(from image: CGImage, context: CIContext) -> CVPixelBuffer? {
+    var buffer: CVPixelBuffer?
+    let attrs = [kCVPixelBufferCGImageCompatibilityKey: true,
+                 kCVPixelBufferCGBitmapContextCompatibilityKey: true] as CFDictionary
+    guard CVPixelBufferCreate(nil, image.width, image.height, kCVPixelFormatType_32BGRA, attrs, &buffer) == kCVReturnSuccess,
+          let buffer else { return nil }
+    context.render(CIImage(cgImage: image), to: buffer)
+    return buffer
+}
+
+func analyzeSnapshots(embedder: FaceEmbedder, matcher: FaceMatcher?) {
+    let dir = SecureFileStore.defaultDirectory()
+    guard let keyData = KeychainStore().get(account: "dataKey") else {
+        print("Keychain'den veri anahtarı okunamadı."); return
+    }
+    let store = SecureFileStore(directory: dir, dataKey: SymmetricKey(data: keyData),
+                                settingsKey: SymmetricKey(size: .bits256))
+    let names = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
+        .filter { $0.hasPrefix("snap-") && $0.hasSuffix(".bin") }.sorted()
+    guard !names.isEmpty else { print("kayıtlı kare yok"); return }
+
+    let detector = FaceDetector()
+    let context = CIContext()
+    print("\n=== KAYDEDİLMİŞ YANLIŞ-ALARM KARELERİ (\(names.count) adet) ===")
+    var noFace = 0, noFaceNoBody = 0, maskSaves = 0
+    var maskValues: [Float] = []
+    for name in names {
+        guard let data = try? store.readEncrypted(Data.self, from: name),
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
+              let buffer = pixelBuffer(from: image, context: context) else {
+            print("  \(name): çözülemedi"); continue
+        }
+        guard let det = try? detector.detect(in: buffer) else { print("  \(name): tespit başarısız"); continue }
+        let handler = VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:])
+        let coverage = personCoverage(handler) ?? -1
+        maskValues.append(coverage)
+
+        let biggest = det.faces.max(by: { $0.boundingBox.height < $1.boundingBox.height })
+        var scoreText = "-"
+        if let face = biggest, face.landmarks5.count == 5,
+           let aligned = FaceCrop.aligned(pixelBuffer: buffer, landmarks: face.landmarks5, context: context),
+           let vector = try? embedder.embed(aligned), let m = matcher {
+            scoreText = String(format: "%.2f", m.score(vector))
+        }
+        if det.faces.isEmpty { noFace += 1 }
+        if det.faces.isEmpty && det.bodies.isEmpty {
+            noFaceNoBody += 1
+            if coverage > 0.15 { maskSaves += 1 }
+        }
+        let ms = Int(Double(name.dropFirst(5).prefix(13)) ?? 0) / 1000
+        let time = DateFormatter()
+        time.dateFormat = "HH:mm:ss"
+        print(String(format: "  %@  yüz=%d gövde=%d  kişi maskesi=%5.1f%%  yaw=%@ kalite=%@ skor=%@",
+                     time.string(from: Date(timeIntervalSince1970: TimeInterval(ms))),
+                     det.faces.count, det.bodies.count, coverage * 100,
+                     biggest.map { String(format: "%+.2f", $0.yaw) } ?? "   -",
+                     biggest.map { String(format: "%.2f", $0.quality) } ?? "  -",
+                     scoreText))
+    }
+    print("\nÖZET")
+    print("  yüz bulunamayan:            \(noFace)/\(names.count)")
+    print("  ne yüz ne gövde (sahne BOŞ sanıldı): \(noFaceNoBody)/\(names.count)")
+    print("  bunların kişi maskesiyle kurtulanı:  \(maskSaves)/\(noFaceNoBody)   ← çözümün dayanağı")
+    print("  kişi maskesi: \(stats(maskValues))")
 }
 
 func loadStoredProfile() -> [[Float]]? {
@@ -337,8 +457,8 @@ func modelURL() -> URL? {
 }
 
 let args = CommandLine.arguments
-guard args.count >= 2, ["live", "presence"].contains(args[1]) else {
-    print("kullanım: nobetci-eval live|presence [saniye]")
+guard args.count >= 2, ["live", "presence", "snaps"].contains(args[1]) else {
+    print("kullanım: nobetci-eval live|presence|snaps [saniye]")
     exit(2)
 }
 let mode = args[1]
@@ -349,6 +469,11 @@ let embedder = try await FaceEmbedder.load(packageURL: url, cacheDir: nil)
 let profile = loadStoredProfile()
 let thresholds = Thresholds(accept: 0.70, sustain: 0.55, reject: 0.40)
 let faceMatcher = profile.map { FaceMatcher(profile: $0, thresholds: thresholds) }
+
+if mode == "snaps" {
+    analyzeSnapshots(embedder: embedder, matcher: faceMatcher)
+    exit(0)
+}
 
 if mode == "presence" {
     let p = PresenceProbe(embedder: embedder, matcher: faceMatcher)

@@ -20,6 +20,14 @@ public struct DetectedBody: Sendable {
 public struct Detections: Sendable {
     public var faces: [DetectedFace]
     public var bodies: [DetectedBody]
+    /// Yalnızca hiç yüz bulunamadığında hesaplanır (bkz `PersonMask`).
+    public var personMask: PersonMask?
+
+    public init(faces: [DetectedFace], bodies: [DetectedBody], personMask: PersonMask? = nil) {
+        self.faces = faces
+        self.bodies = bodies
+        self.personMask = personMask
+    }
 }
 
 /// Apple Vision sarmalayıcısı: yüz dikdörtgeni + noktalar + kalite ve üst gövde.
@@ -27,7 +35,30 @@ public struct Detections: Sendable {
 public final class FaceDetector {
     public init() {}
 
-    public func detect(in pixelBuffer: CVPixelBuffer) throws -> Detections {
+    /// Kişi bölütleme maskesi (`.fast`: akış için tasarlanmış kalite seviyesi).
+    static func segmentPerson(handler: VNImageRequestHandler) -> PersonMask? {
+        let request = VNGeneratePersonSegmentationRequest()
+        request.qualityLevel = .fast
+        request.outputPixelFormat = kCVPixelFormatType_OneComponent8
+        guard (try? handler.perform([request])) != nil,
+              let buffer = request.results?.first?.pixelBuffer else { return nil }
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(buffer) else { return nil }
+        let w = CVPixelBufferGetWidth(buffer), h = CVPixelBufferGetHeight(buffer)
+        let stride = CVPixelBufferGetBytesPerRow(buffer)
+        let pixels = base.assumingMemoryBound(to: UInt8.self)
+        var values = [UInt8](repeating: 0, count: w * h)
+        for y in 0..<h {
+            let src = y * stride, dst = y * w
+            for x in 0..<w { values[dst + x] = pixels[src + x] }
+        }
+        return PersonMask(values: values, width: w, height: h)
+    }
+
+    /// `needsPersonMask`: yalnızca taşınacak bir sahip çapası varken hesaplanır.
+    /// Sahip gerçekten yokken maskeye gerek yoktur; böylece kilitli beklerken bedeli sıfırdır.
+    public func detect(in pixelBuffer: CVPixelBuffer, needsPersonMask: Bool = true) throws -> Detections {
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
         let w = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
         let h = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
@@ -39,11 +70,15 @@ public final class FaceDetector {
         // Gövde taraması yalnızca yüz yokken (T2 yüzsüz kişi). Yüz varken T1 zaten karar verir;
         // isteği atlamak kare başı süreyi düşürür → yabancıya tepki hızlanır, CPU azalır (D15).
         var detectedBodies: [DetectedBody] = []
+        var personMask: PersonMask?
         if faceObservations.isEmpty {
             let bodies = VNDetectHumanRectanglesRequest()
             if #available(macOS 12.0, *) { bodies.upperBodyOnly = true }
             try handler.perform([bodies])
             detectedBodies = (bodies.results ?? []).map { DetectedBody(boundingBox: $0.boundingBox) }
+            // Yüz yokken kişi maskesi: profil/örtülü yüzde ve yakın mesafede gövde dedektörü
+            // susuyor; maske insanı yöne bakmadan görür. Yalnızca bu dalda çalışır (maliyet).
+            if needsPersonMask { personMask = Self.segmentPerson(handler: handler) }
         }
 
         // Kaliteyi AYNI yüz gözlemleri üzerinde hesapla → sonuçlar 1:1 ve sıralı.
@@ -71,7 +106,7 @@ public final class FaceDetector {
                 yaw: obs.yaw?.floatValue ?? 0,
                 pitch: obs.pitch?.floatValue ?? 0))
         }
-        return Detections(faces: faces, bodies: detectedBodies)
+        return Detections(faces: faces, bodies: detectedBodies, personMask: personMask)
     }
 
     /// Vision normalize noktalarını (yüz kutusuna göre, y yukarı) görüntü pikseli (y aşağı) 5 noktaya çevirir.

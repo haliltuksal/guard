@@ -755,3 +755,41 @@ okunamayan bir yüz çapayı sürdürür; **okunabilir** ve kesin yabancı (skor
 
 **Doğrulama:** `swift run nobetci-eval presence 30` — sahip okunmayan karelerde iz/gövde
 kapsamasını ve poz dağılımını ölçer; okunabilirlik eşikleri bu çıktıyla kalibre edilir.
+
+
+## 19. "Sahne boş sanılması" — çapanın ikinci katmanı (2026-10-21)
+
+§18'deki çapa yerinde olmasına rağmen cihazda beş yanlış alarm daha yaşandı (17:04–17:06):
+yan ekrana bakarken (*kilit: girdi*), masada bir şeye uzanırken (*kadrajda*), saçını
+düzeltirken (*kilit: kamera kaydı*), yüzünü kaşırken (*kadrajda*).
+
+**Ölçüm:** `nobetci-eval presence 30` — sahip tanınmayan karelerin **%0'ında** gövde
+bulundu; %62'sinde ne yüz ne gövde vardı. Yani yakın oturan kullanıcıda
+`VNDetectHumanRectanglesRequest` hiç tetiklenmiyor.
+
+**Kök neden (ikinci katman):** Yüz dedektörü profil/örtülü/aşağı bakan yüzü kaçırınca ve
+gövde dedektörü de susunca `anyPerson = false` oluyor; sistem sahneyi **boş** sanıyor.
+Bu tek yanlış çıkarım üç ayrı arızaya yol açıyordu:
+1. Çapa taşınamıyor → varlık düşüyor → girdi kilitliyor (T3).
+2. Sahip "kadrajdaki yabancı" sayılıp fotoğraflanıyor.
+3. Boş sanılan sahnedeki büyük görüntü değişimi "kamera oynatıldı" (T8) okunuyor — elin
+   saçına gitmesi kilit sebebi oluyordu.
+
+**Çözüm:** `VNGeneratePersonSegmentationRequest` (`.fast`) ile **kişi maskesi**. Maske
+insanı yöne bakmadan görür. Yalnızca (a) hiç yüz bulunamadığında ve (b) taşınacak canlı
+bir çapa varken hesaplanır — sahip gerçekten yokken bedeli sıfırdır.
+
+- **Bölgeyle sınırlı bakılır** (`PersonMask.ownerRegion`): soru "kadrajda biri var mı"
+  değil, "**sahibin durduğu yerde** hâlâ biri var mı"dır. Sandalyeye asılı bir mont ya da
+  arkadan geçen biri çapayı yaşatmaz. Eşik: bölgede %20 kişi pikseli.
+- **Tek yüz evlat edinme** (`canAdoptSoleFace`): masada bir şeye uzanırken kutu çok kayar,
+  IoU tutmaz. Kadrajda tek yüz varsa ve sahne boşalmadıysa o yüz sahibin devamı sayılır —
+  tanıma yerine geçmez, yalnızca varlığı sürdürür.
+- **T8 bastırma:** çapa canlıyken kadrajdaki değişim sahibin kendi hareketidir.
+
+**Güvenlik:** Maske yalnızca *var olan* bir çapayı taşır; varlık kurmaz. Okunabilir ve kesin
+yabancı bir yüz çapayı düşürür. Taşıma `carryLimit` (10 dk) ile sınırlıdır. Sahip
+kadrajdan çıkıp bölgesi boşalınca çapa 1,5 sn içinde ölür.
+
+**Kalibrasyon:** `nobetci-eval presence` çıktısındaki "KİŞİ MASKESİ" bölümü bölge oranının
+dağılımını verir; %20 eşiği bununla doğrulanır.
