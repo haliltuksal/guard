@@ -4,7 +4,7 @@
 2. Açılan pencerede **Nöbetçi**'yi **Applications** klasörüne sürükle.
 3. Launchpad'den ya da Applications'tan Nöbetçi'yi aç.
 4. İlk açılışta macOS "geliştirici doğrulanamadı" uyarısı verebilir (uygulama
-   Apple tarafından notarize edilmedi — arkadaşlar arası paylaşım sürümü):
+   Apple tarafından notarize edilmedi — App Store dışı sürüm):
    - **Sistem Ayarları → Gizlilik ve Güvenlik**'i aç.
    - Aşağıda "Nöbetçi engellendi" satırının yanındaki **"Yine de Aç"**a tıkla.
 5. Kurulum sihirbazı açılır:

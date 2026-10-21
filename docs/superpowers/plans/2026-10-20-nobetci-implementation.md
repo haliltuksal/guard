@@ -626,7 +626,7 @@ T1–T14 tepki süreleri; girdi matrisi (D7 tam); kalkan kapsaması; blur okunam
 `docs/test-report.md` §11 tablosu: boş sahne CPU < %5, kişi < %25, bellek < 300 MB, tepki süreleri, Neural Engine ≤ 10 ms, 30 dk enerji. Aşımda analiz hızı/çözünürlük ayarı.
 
 ### Görev 7.3: DMG, KURULUM.md, README, CHANGELOG, kaldırma
-`make dist` → `Nöbetçi-<sürüm>.dmg`; `KURULUM.md` (sürükle + "Yine de Aç"); `README`; `CHANGELOG`; Ayarlar'da "Nöbetçi'yi kaldır" (launchd kaydı + Keychain + veri temizler, şifre ister). D21: Fatih'in Mac'inde (macOS 14/15) kabul alt kümesi. Commit `release: 1.0.0`.
+`make dist` → `Nöbetçi-<sürüm>.dmg`; `KURULUM.md` (sürükle + "Yine de Aç"); `README`; `CHANGELOG`; Ayarlar'da "Nöbetçi'yi kaldır" (launchd kaydı + Keychain + veri temizler, şifre ister). D21: ikinci bir Mac'te (macOS 14/15) kabul alt kümesi. Commit `release: 1.0.0`.
 
 ---
 

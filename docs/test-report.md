@@ -46,7 +46,7 @@ verip uygulamayı çalıştırınca birlikte yürütülecek.
 | D17 | Ekran/HID/USB/güç bildirimleri | Tak-çıkar | Bekliyor |
 | D18 | Şifrede Türkçe düzen/Option/ölü tuş (kalkanda uçtan uca) | Kilitliyken yaz | Ön doğrulama ✅ (V15); kalkanda bekliyor |
 | D20 | Sesli Denetim tespiti | Ayarı açıp kapat | Bekliyor |
-| D21 | macOS 14/15 uyumu | Fatih'in Mac'inde kabul alt kümesi | Bekliyor |
+| D21 | macOS 14/15 uyumu | İkinci bir Mac'te (macOS 14/15) kabul alt kümesi | Bekliyor |
 
 ## 3. Kabul testleri (spec §13.4) — cihazda
 

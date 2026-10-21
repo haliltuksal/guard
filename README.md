@@ -16,7 +16,7 @@ Masandan kalktığında Mac'ini **uyanık tutan**, başına **yabancı biri geç
 
 1. **[Releases](https://github.com/haliltuksal/guard/releases)** sayfasından en son `Nobetci-x.y.z.dmg` dosyasını indir.
 2. DMG'yi aç, **Nöbetçi**'yi **Applications** klasörüne sürükle.
-3. Nöbetçi'yi aç. macOS **"geliştirici doğrulanamadı"** diyecek — bu normal (App Store dışı, arkadaşlar arası sürüm):
+3. Nöbetçi'yi aç. macOS **"geliştirici doğrulanamadı"** diyecek — bu normal (App Store dışı, Apple tarafından notarize edilmemiş sürüm):
    **Sistem Ayarları → Gizlilik ve Güvenlik** → aşağıda *"Nöbetçi engellendi"* satırının yanındaki **"Yine de Aç"**.
 4. Açılan **kurulum sihirbazı**nda:
    - **İzinler:** Kamera, Erişilebilirlik ve Bildirimler — çıkan pencerelerde izin ver.
@@ -87,4 +87,4 @@ Tasarım: `docs/superpowers/specs/` · Plan: `docs/superpowers/plans/` · Model:
 
 İlkeler: üçüncü parti çalışma zamanı bağımlılığı yok · ağ yok · fotoğraf yok · sahte etkinlik yok · emin olunamayan her durumda kilitle.
 
-**Lisans notu:** Yüz modeli ağırlıkları (VGGFace2 üzerinde eğitilmiş FaceNet) ticari olmayan kullanım içindir; bu depo arkadaşlar arası ücretsiz paylaşım için uygundur.
+**Lisans notu:** Yüz modeli ağırlıkları (VGGFace2 üzerinde eğitilmiş FaceNet) ticari olmayan kullanım içindir.

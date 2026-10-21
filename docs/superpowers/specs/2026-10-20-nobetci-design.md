@@ -33,7 +33,7 @@ Nöbetçi, menü çubuğunda çalışan bir macOS uygulamasıdır. Kullanıcı k
 - Sahip döndüğünde "Sen yokken olanlar" raporu gösterilir.
 
 ### 1.3 Hedef kullanıcılar
-Halil ve birkaç arkadaşı (ör. Fatih). Uygulama dosya (DMG) olarak paylaşılır; App Store ve notarization yoktur. Arayüz Türkçedir.
+Kendi Mac'ini korumak isteyen bireysel kullanıcılar. Uygulama DMG olarak dağıtılır; App Store ve notarization yoktur. Arayüz Türkçedir.
 
 ### 1.4 Başarı ölçütleri
 1. Sahip yokken biri gelirse ekran **1 sn'den kısa sürede** okunamaz hale gelir ve **hiçbir girdi hiçbir uygulamaya ulaşmaz** (tetikleyici bazında hedefler §5.3).
@@ -575,7 +575,7 @@ Büyük ikili dosyalar (model ağırlıkları, `.mlpackage`, veri setleri) ve ki
 - `make cert`, kullanıcının giriş anahtar zincirinde "Nöbetçi Code Signing" adlı kendinden imzalı bir sertifika (codeSigning EKU) oluşturur. Bu Mac'te şu an hiç imzalama kimliği yoktur (V13).
 - Amaç sabit bir *designated requirement*: yeni sürümler kurulduğunda kamera ve erişilebilirlik izinleri korunur (D11).
 
-### 12.5 Kurulum (arkadaşlar için)
+### 12.5 Kurulum (son kullanıcı)
 `KURULUM.md`: DMG'yi aç → Nöbetçi'yi Applications'a sürükle → ilk açılışta Gatekeeper uyarısı → Sistem Ayarları → Gizlilik ve Güvenlik → **Yine de Aç** → kurulum sihirbazı.
 
 ### 12.6 Sürümleme
@@ -609,10 +609,10 @@ Her madde ölçümüyle birlikte `docs/test-report.md` dosyasına yazılır.
 6. **Şifre:** Türkçe karakterler (ğ ü ş ı ö ç), Option karakterleri, ölü tuşlar; bekleme süreleri; uygulama yeniden başlatılınca sayacın korunması.
 7. **Uyanık tutma:** 15 dk nöbette Mac uyumuyor; ekran koruyucu 1 dk'ya ayarlıyken başlamıyor; ekran kararmıyor; otomatik kilit açılmıyor. Ayrıca `pmset -g assertions` çıktısında yalnızca uyku engelleme bildirimleri görünüyor, `UserIsActive` yok.
 8. **Yaşam döngüsü:** `kill -9` → ≤ 2 sn'de kilitli açılış; arka arkaya iki kez; uyku/uyanma; yeniden başlatma → Kapalı başlangıç; elle açma → tek kopya.
-9. **İmza:** yeniden derleyip kurunca izinler korunuyor; başka bir Mac'te (Fatih) "Yine de Aç" akışı.
+9. **İmza:** yeniden derleyip kurunca izinler korunuyor; başka bir Mac'te "Yine de Aç" akışı.
 10. **Gizlilik:** nöbet boyunca ağ bağlantısı yok (`lsof`); diskte şifresiz yüz verisi yok.
 11. **Performans:** §11 bütçeleri (30 dk ölçüm).
-12. **Sürüm uyumu:** Geliştirme Mac'i macOS 26.5'tir; macOS 14/15 uyumu için kabul testlerinin bir alt kümesi Fatih'in Mac'inde koşulur (D21).
+12. **Sürüm uyumu:** Geliştirme Mac'i macOS 26.5'tir; macOS 14/15 uyumu için kabul testlerinin bir alt kümesi ikinci bir Mac'te koşulur (D21).
 
 ### 13.5 Tanılama paneli (yalnızca debug derlemesinde)
 - Canlı sinyaller: benzerlik skorları, iz kimlikleri, EAR, kapak açısı, ivme, kare ve analiz hızı, CPU, girdi filtresi ve secure input durumu.
@@ -682,7 +682,7 @@ Deney betikleri `tools/probes/` altındadır.
 | D18 | Şifre yakalamada Türkçe düzen, Option karakterleri ve ölü tuşlar | ~~Ön doğrulama V15'te yapıldı~~ · kalkanda uçtan uca §13.4-6 | Kurulumda karakter kısıtı |
 | D19 | ~~`llvm-cov` kod kapsamı aracının CLT'de kullanılabilirliği~~ → **V16'da doğrulandı** | — | — |
 | D20 | Sesli Denetim'in açık olup olmadığının güvenilir tespiti | Ayarı açıp kapatarak | Kurulumda kullanıcıya sorma |
-| D21 | macOS 14/15 uyumluluğu (geliştirme Mac'i macOS 26.5) | Fatih'in Mac'inde kabul alt kümesi | Gerekirse minimum sürümü yükseltme |
+| D21 | macOS 14/15 uyumluluğu (geliştirme Mac'i macOS 26.5) | İkinci bir Mac'te (macOS 14/15) kabul alt kümesi | Gerekirse minimum sürümü yükseltme |
 
 ---
 
@@ -690,7 +690,7 @@ Deney betikleri `tools/probes/` altındadır.
 
 | Konu | Karar |
 |---|---|
-| Hedef kitle | B — Halil + birkaç arkadaş; dosya olarak paylaşım |
+| Hedef kitle | B — bireysel kullanıcılar; DMG ile dağıtım (App Store yok) |
 | Dönüş davranışı | C — ayar; varsayılan "nöbet kapansın" |
 | Ekstralar | "Sen yokken olanlar" raporu ✓ · klavye kısayolu ✓ · fotoğraf ✗ (önce seçildi, sonra kullanıcı kararıyla çıkarıldı) · gerçek macOS kilidi ✗ (yerine yalnızca yüz + uygulama şifresi) · ayrı "uyanık tut" modu ✗ · sahte etkinlik/"aktif görünme" ✗ (etik gerekçeyle çıkarıldı) · telefon bildirimi ✗ |
 | Yaklaşım | Native Swift + Apple Vision + Core ML yüz tanıma modeli |
