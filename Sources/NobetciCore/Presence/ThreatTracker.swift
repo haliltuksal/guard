@@ -6,7 +6,7 @@ import Foundation
 /// (cihazda 0,1 sn'de "yabancı yüz" sayılmıştı) tanınma şansı bulur; gerçek yabancı
 /// (skor çok düşük) yine 3 karede yakalanır.
 public struct ThreatTracker: Sendable {
-    public static let uncertainGrace: TimeInterval = 0.5
+    public static let uncertainGrace: TimeInterval = 0.3   // dönen sahip ~9 karede tanınır; yabancıda blur gecikmesi kısa
     public static let strangerFrames = 3
 
     private struct State { var firstSeen: TimeInterval; var belowRejectStreak: Int }

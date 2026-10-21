@@ -19,7 +19,7 @@ public struct GuardEngine: Sendable {
     private var bootSession = ""
     private var requestedTurn: Turn = .left
     private var strangerStreak = 0   // T1 debounce: ardışık yabancı/belirsiz kare sayısı
-    private static let strangerFramesToLock = 3
+    private static let strangerFramesToLock = 2   // pipeline iz başına zamanlıyor; burası yalnızca tek-kare arıza koruması
     private var lastBlinkPromptAt: TimeInterval = -.greatestFiniteMagnitude
     private static let promptStickiness: TimeInterval = 1.0   // "göz kırp" istemi tek kaçan karede düşmesin
 

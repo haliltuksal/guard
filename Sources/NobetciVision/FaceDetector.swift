@@ -33,10 +33,18 @@ public final class FaceDetector {
         let h = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
 
         let landmarks = VNDetectFaceLandmarksRequest()
-        let bodies = VNDetectHumanRectanglesRequest()
-        if #available(macOS 12.0, *) { bodies.upperBodyOnly = true }
-        try handler.perform([landmarks, bodies])
+        try handler.perform([landmarks])
         let faceObservations = landmarks.results ?? []
+
+        // Gövde taraması yalnızca yüz yokken (T2 yüzsüz kişi). Yüz varken T1 zaten karar verir;
+        // isteği atlamak kare başı süreyi düşürür → yabancıya tepki hızlanır, CPU azalır (D15).
+        var detectedBodies: [DetectedBody] = []
+        if faceObservations.isEmpty {
+            let bodies = VNDetectHumanRectanglesRequest()
+            if #available(macOS 12.0, *) { bodies.upperBodyOnly = true }
+            try handler.perform([bodies])
+            detectedBodies = (bodies.results ?? []).map { DetectedBody(boundingBox: $0.boundingBox) }
+        }
 
         // Kaliteyi AYNI yüz gözlemleri üzerinde hesapla → sonuçlar 1:1 ve sıralı.
         // (Kutu-dizesiyle eşleştirme iki isteğin kutuları birebir örtüşmediği için ~0 veriyordu.)
@@ -63,7 +71,6 @@ public final class FaceDetector {
                 yaw: obs.yaw?.floatValue ?? 0,
                 pitch: obs.pitch?.floatValue ?? 0))
         }
-        let detectedBodies = (bodies.results ?? []).map { DetectedBody(boundingBox: $0.boundingBox) }
         return Detections(faces: faces, bodies: detectedBodies)
     }
 

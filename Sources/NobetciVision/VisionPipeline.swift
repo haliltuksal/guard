@@ -94,7 +94,10 @@ public final class VisionPipeline: @unchecked Sendable {
         }
         if coveredNow { return PipelineOutput(summary: nil, cameraHealth: nil) }
         let (locked, requestedTurn) = stateLock.withLock { (_locked, _requestedTurn) }
-        let needFull = locked || metrics.motionEnergy > 0.02 || (now - lastFullAnalysis) >= 0.5
+        // Biri görünür görünmez tam analiz HER karede (30 fps): yabancı/yaklaşan kişide blur gecikmesi
+        // sahnenin durgunluğuna bağlı kalmasın. Kimse yokken 0,5 sn'de bir (pil).
+        let personRecently = lastPersonSeen.map { now - $0 <= 1.0 } ?? false
+        let needFull = locked || personRecently || metrics.motionEnergy > 0.02 || (now - lastFullAnalysis) >= 0.5
         guard needFull, let detections = try? detector.detect(in: pixelBuffer) else {
             return PipelineOutput(summary: nil, cameraHealth: nil)   // skip: motora kare gönderme
         }
@@ -116,7 +119,7 @@ public final class VisionPipeline: @unchecked Sendable {
         let ownerTrackRecent = ownerTrackID != nil && now - ownerTrackLastSeen <= Self.ownerTrackMemory
         threats.retain(onlyIDs: Set(ids))
 
-        // T1 zamanlaması iz başına (spec): belirsiz → 0,5 sn kabul süresi; yabancı → 3 ardışık T_red altı.
+        // T1 zamanlaması iz başına: belirsiz → 0,3 sn kabul süresi; yabancı → 3 ardışık T_red altı.
         func flag(_ r: (uncertain: Bool, stranger: Bool)) {
             if r.uncertain { uncertainPresent = true }
             if r.stranger { strangerPresent = true }

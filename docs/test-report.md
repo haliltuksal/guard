@@ -98,3 +98,4 @@ Her satır çalıştırıldığında ölçümüyle buraya yazılacak.
 | Kadraja geri giriş | 0,1 sn'de "yabancı yüz" → T1 iz-başına 0,5 sn kabul süresi (spec) |
 | Gece odası | parlaklık 0,29, doku 0,04 → "loş" eşiği 0,2, doku 0,01 (örtülü değil) |
 | Dönüş davranışı | Kullanıcı kararı: varsayılan **nöbet sürsün**; durdurma = "Buradayım" |
+| Yabancı yüzde blur gecikmesi | Kullanıcı: "biraz geç". Zincir: durgun sahnede 0,5 sn analiz aralığı + 0,5 sn belirsiz kabul + motor 3 kare. → Kişi görünür görünmez her kare analiz; kabul 0,3 sn; motor 2 kare; yüz varken gövde taraması atlanır (kare başı süre ↓). Ölçülecek. |
