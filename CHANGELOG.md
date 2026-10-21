@@ -27,3 +27,4 @@ doğrulama (izinler, görsel kontroller, imza) bekliyor — bkz `docs/test-repor
 ### Değişenler (2026-10-21)
 - Dönüş davranışı varsayılanı "nöbet sürsün" (kullanıcı kararı); menüde "Buradayım".
 - T1 zamanlaması iz başına (0,5 sn kabul / 3 kare T_red altı); T6 ≥0,5 sn süreklilik.
+- Göz kırpma (canlılık) varsayılan kapalı, isteğe bağlı (kullanıcı kararı); kilit açma kayan pencere (1 sn/≥5); eski settings.json yeni anahtarlarla uyumlu.

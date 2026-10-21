@@ -189,8 +189,9 @@ private func leave(_ e: inout GuardEngine) {
 }
 
 @Test func blinkPromptIsStickyForOneSecond() {
-    // "Göz kırp" istendikten sonra tek bir kaçan kare mesajı "Seni arıyorum"a düşürmemeli (titreme).
-    var e = started()
+    // (Göz kırpma açıkken) istemden sonra tek bir kaçan kare mesajı "Seni arıyorum"a düşürmemeli (titreme).
+    var s = GuardSettings(); s.requireBlink = true
+    var e = started(settings: s)
     leave(&e)
     _ = e.handle(.input)                        // locked
     var ask = ownerFrame(at: 3.0); ask.blinkObservedWithin = nil

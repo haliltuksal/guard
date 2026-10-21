@@ -35,9 +35,11 @@ public struct UnlockEvaluator: Sendable {
         }
         // 4) Yüz kalitesi/boyutu yeterli olmalı.
         if !frame.ownerQualityOK { return .lowQuality }
-        // 2) Canlılık: son 3 sn içinde kırpma.
-        guard let since = frame.blinkObservedWithin, since <= Self.blinkWindow else {
-            return .needBlink
+        // 2) Canlılık (isteğe bağlı; kullanıcı kararı: varsayılan kapalı — tanıyınca aç).
+        if settings.requireBlink {
+            guard let since = frame.blinkObservedWithin, since <= Self.blinkWindow else {
+                return .needBlink
+            }
         }
         // Sıkı mod: istenen baş hareketi.
         if settings.strictMode, !frame.strictGestureSatisfied {

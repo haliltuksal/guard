@@ -8,7 +8,17 @@ import Foundation
     #expect(s.distance == .medium && s.lid == .medium && s.motion == .medium)
     #expect(s.facelessDetection && s.cameraShiftDetection && s.displayTrigger && s.usbTrigger && s.powerTrigger)
     #expect(!s.strictMode)
+    #expect(!s.requireBlink)   // kullanıcı kararı (2026-10-21): tanıyınca aç, göz kırpma isteğe bağlı
     #expect(s.historyRetentionDays == 30 && s.startAtLogin)
+}
+
+@Test func decodesOlderSettingsMissingNewKeysWithDefaults() throws {
+    // Yeni bir ayar anahtarı eklenince diskteki eski settings.json geçersiz sayılmamalı.
+    let json = Data(#"{"strictMode":true}"#.utf8)
+    let s = try JSONDecoder().decode(GuardSettings.self, from: json)
+    #expect(s.strictMode)
+    #expect(!s.requireBlink)
+    #expect(s.returnBehavior == .keepGuarding)
 }
 
 @Test func settingsRoundTripJSON() throws {

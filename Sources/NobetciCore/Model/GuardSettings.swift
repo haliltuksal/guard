@@ -43,9 +43,39 @@ public struct GuardSettings: Codable, Equatable, Sendable {
     public var usbTrigger: Bool = true
     public var powerTrigger: Bool = true
     public var strictMode: Bool = false
+    /// Canlılık: kilit açmak için göz kırpma iste. Kullanıcı kararı (2026-10-21): varsayılan KAPALI —
+    /// tanıyınca açılır. Açıldığında fotoğrafla kandırmayı zorlaştırır.
+    public var requireBlink: Bool = false
     public var historyRetentionDays: Int = 30
     public var startAtLogin: Bool = true
     public var hotKey: HotKeySpec = .default
 
     public init() {}
+
+    enum CodingKeys: String, CodingKey {
+        case returnBehavior, distance, lid, motion, facelessDetection, cameraShiftDetection
+        case displayTrigger, usbTrigger, powerTrigger, strictMode, requireBlink
+        case historyRetentionDays, startAtLogin, hotKey
+    }
+
+    /// Eksik anahtarlar varsayılanla doldurulur: yeni bir ayar eklendiğinde diskteki eski
+    /// settings.json geçersiz sayılıp tüm tercihler sıfırlanmasın.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = GuardSettings()
+        returnBehavior = try c.decodeIfPresent(ReturnBehavior.self, forKey: .returnBehavior) ?? d.returnBehavior
+        distance = try c.decodeIfPresent(DistanceSensitivity.self, forKey: .distance) ?? d.distance
+        lid = try c.decodeIfPresent(Sensitivity.self, forKey: .lid) ?? d.lid
+        motion = try c.decodeIfPresent(Sensitivity.self, forKey: .motion) ?? d.motion
+        facelessDetection = try c.decodeIfPresent(Bool.self, forKey: .facelessDetection) ?? d.facelessDetection
+        cameraShiftDetection = try c.decodeIfPresent(Bool.self, forKey: .cameraShiftDetection) ?? d.cameraShiftDetection
+        displayTrigger = try c.decodeIfPresent(Bool.self, forKey: .displayTrigger) ?? d.displayTrigger
+        usbTrigger = try c.decodeIfPresent(Bool.self, forKey: .usbTrigger) ?? d.usbTrigger
+        powerTrigger = try c.decodeIfPresent(Bool.self, forKey: .powerTrigger) ?? d.powerTrigger
+        strictMode = try c.decodeIfPresent(Bool.self, forKey: .strictMode) ?? d.strictMode
+        requireBlink = try c.decodeIfPresent(Bool.self, forKey: .requireBlink) ?? d.requireBlink
+        historyRetentionDays = try c.decodeIfPresent(Int.self, forKey: .historyRetentionDays) ?? d.historyRetentionDays
+        startAtLogin = try c.decodeIfPresent(Bool.self, forKey: .startAtLogin) ?? d.startAtLogin
+        hotKey = try c.decodeIfPresent(HotKeySpec.self, forKey: .hotKey) ?? d.hotKey
+    }
 }

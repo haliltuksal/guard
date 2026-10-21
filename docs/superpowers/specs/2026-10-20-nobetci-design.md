@@ -199,8 +199,8 @@ Yan etkileri uygulama katmanındaki `EffectRunner` adaptörlere dağıtır.
 ### 5.4 Kilit açma
 
 **Yüzle** — aynı iz üzerinde aşağıdakilerin hepsi birlikte sağlanmalıdır:
-1. ≤ 1 sn içinde ≥ 5 analiz karesinde `T_kabul` üzerinde eşleşme.
-2. **Canlılık:** aynı iz üzerinde son 3 sn içinde en az bir göz kırpma (§6.7). Kırpma algılanmadıysa kalkanda "Göz kırp" ipucu çıkar.
+1. ≤ 1 sn içinde ≥ 5 analiz karesinde `T_kabul` üzerinde eşleşme (kayan pencere; ardışık değil).
+2. **Canlılık:** aynı iz üzerinde son 3 sn içinde en az bir göz kırpma (§6.7). Kırpma algılanmadıysa kalkanda "Göz kırp" ipucu çıkar. **İsteğe bağlı — kullanıcı kararı (2026-10-21): varsayılan KAPALI; tanıyınca açılır.** Açıldığında fotoğrafla kandırmayı zorlaştırır (Ayarlar → Kilit açma → "Göz kırpma iste").
 3. Karede mesafe eşiğini geçen başka bir yüz ya da gövde yoktur. Varsa yüzle açılmaz; kalkanda "Yanında biri var — şifre gerekli" yazar.
 4. Yüz kalitesi (Vision capture quality) yeterlidir ve yüz en az Yakın mesafe eşiği boyutundadır (≈ 0,8 m ya da daha yakın).
 
@@ -465,7 +465,7 @@ Uygulama hiçbir ağ API'si kullanmaz. Kabul testinde nöbet boyunca ağ bağlan
 
 | Risk | Durum / önlem |
 |---|---|
-| Sahibin göz kırptığı bir videoyla kandırma | Varsayılan modda mümkün olabilir; sıkı mod zorlaştırır |
+| Sahibin fotoğrafı/videosuyla kandırma | Göz kırpma varsayılan KAPALI (kullanıcı kararı) → basılı fotoğraf bile teorik olarak yeterli olabilir; "Göz kırpma iste" ve sıkı mod zorlaştırır |
 | Tek yumurta ikizi ya da çok benzer akraba | Ölçülen FAR ile sınırlı; şifre her zaman alternatif |
 | Siri / Sesli Denetim ile sesli komut | Bu Mac'te Siri kapalı (V14); kurulumda tespit edilip uyarı verilir |
 | Başka bir sürecin doğrudan bir uygulamaya olay göndermesi (`CGEventPostToPid`) | Önceden kurulu, erişilebilirlik izinli bir süreç gerektirir — kapsam dışı; davranış testte belgelenir (D7) |

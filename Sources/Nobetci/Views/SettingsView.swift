@@ -58,6 +58,7 @@ struct SettingsView: View {
 
     private var unlock: some View {
         Form {
+            Toggle("Göz kırpma iste (fotoğrafla kandırmayı zorlaştırır)", isOn: $settings.requireBlink)
             Toggle("Sıkı mod (baş hareketi iste)", isOn: $settings.strictMode)
             Section("Yüz profili") {
                 if reenrolling {

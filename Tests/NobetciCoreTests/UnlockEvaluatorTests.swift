@@ -37,14 +37,27 @@ private func readyFrame() -> FrameSummary {
     #expect(e.evaluate(frame: g, settings: GuardSettings(), requestedTurn: .left, now: 10) == .bystander)
 }
 
-@Test func lowQualityAndMissingBlinkReported() {
+@Test func lowQualityReported() {
     let e = UnlockEvaluator()
     var lowQ = readyFrame(); lowQ.ownerQualityOK = false
     #expect(e.evaluate(frame: lowQ, settings: GuardSettings(), requestedTurn: .left, now: 10) == .lowQuality)
+}
+
+@Test func blinkNotRequiredByDefault() {
+    // Kullanıcı kararı: tanıyınca aç. Göz kırpma gelmemiş olsa da açılır.
+    let e = UnlockEvaluator()
     var noBlink = readyFrame(); noBlink.blinkObservedWithin = nil
-    #expect(e.evaluate(frame: noBlink, settings: GuardSettings(), requestedTurn: .left, now: 10) == .needBlink)
+    #expect(e.evaluate(frame: noBlink, settings: GuardSettings(), requestedTurn: .left, now: 10) == .unlock)
+}
+
+@Test func blinkRequiredWhenEnabled() {
+    let e = UnlockEvaluator()
+    var s = GuardSettings(); s.requireBlink = true
+    var noBlink = readyFrame(); noBlink.blinkObservedWithin = nil
+    #expect(e.evaluate(frame: noBlink, settings: s, requestedTurn: .left, now: 10) == .needBlink)
     var oldBlink = readyFrame(); oldBlink.blinkObservedWithin = 4.0
-    #expect(e.evaluate(frame: oldBlink, settings: GuardSettings(), requestedTurn: .left, now: 10) == .needBlink)
+    #expect(e.evaluate(frame: oldBlink, settings: s, requestedTurn: .left, now: 10) == .needBlink)
+    #expect(e.evaluate(frame: readyFrame(), settings: s, requestedTurn: .left, now: 10) == .unlock)   // 1 sn önce kırptı
 }
 
 @Test func strictModeRequiresGesture() {
