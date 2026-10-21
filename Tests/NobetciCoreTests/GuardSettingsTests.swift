@@ -10,7 +10,7 @@ import Foundation
     #expect(!s.strictMode)
     #expect(!s.requireBlink)   // kullanıcı kararı (2026-10-21): tanıyınca aç, göz kırpma isteğe bağlı
     #expect(s.captureSnapshots)                 // sen yokken yaklaşanların fotoğrafı (kullanıcı isteği)
-    #expect(s.snapshotRetentionDays == 30)
+    #expect(s.snapshotRetentionDays == 1)    // kullanıcı kararı (2026-10-21): fotoğraflar 1 gün sonra silinir
     #expect(s.historyRetentionDays == 30 && s.startAtLogin)
 }
 

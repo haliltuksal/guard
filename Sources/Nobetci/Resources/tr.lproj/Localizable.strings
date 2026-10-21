@@ -61,3 +61,17 @@
 
 /* Ayarlar — fotoğraflar */
 "settings.photos" = "Fotoğraflar";
+
+/* Fotoğraf galerisi */
+"menu.photos" = "Fotoğraflar";
+"photos.title" = "Yaklaşanlar";
+"photos.open" = "Fotoğrafları göster";
+"photos.whileAway" = "Sen yokken %@ kare yakalandı";
+"photos.empty" = "Henüz fotoğraf yok";
+"photos.empty.hint" = "Sen yokken biri kadraja girerse fotoğrafı burada görünür.";
+"photos.delete.one" = "Bu fotoğrafı sil";
+"photos.delete.all" = "Tümünü sil";
+"photos.delete.all.confirm" = "Tüm fotoğraflar silinsin mi?";
+"photos.close.zoom" = "Kapat";
+"photos.zoom.hint" = "Büyütmek için tıkla";
+"report.photos" = "Kimler yaklaştı (%@)";

@@ -29,4 +29,7 @@ doğrulama (izinler, görsel kontroller, imza) bekliyor — bkz `docs/test-repor
 - T1 zamanlaması iz başına (0,5 sn kabul / 3 kare T_red altı); T6 ≥0,5 sn süreklilik.
 - Göz kırpma (canlılık) varsayılan kapalı, isteğe bağlı (kullanıcı kararı); kilit açma kayan pencere (1 sn/≥5); eski settings.json yeni anahtarlarla uyumlu.
 - Bütünsel bakış: derleme uyarıları 0; kilit sayacı/durum Keychain’de (§9.1); klavye düzeni her nöbette tazelenir (§7.3); PBKDF2 turu ~250 ms’ye kalibre (§9.2); kilit açma penceresine yalnızca T_kabul üstü kareler (§5.4.1).
-- Sen yokken yaklaşanların fotoğrafı geri eklendi: şifreli, yalnızca cihazda, hız sınırlı (3 sn/50), saklama süresi 30 gün, raporda görüntülenir, Ayarlar → Fotoğraflar.
+- Sen yokken yaklaşanların fotoğrafı geri eklendi: şifreli, yalnızca cihazda, hız sınırlı (3 sn/50), raporda görüntülenir, Ayarlar → Fotoğraflar.
+- Fotoğraf galerisi: menüdeki **Fotoğraflar** düğmesi (adet rozetiyle) tüm kayıtlı fotoğrafları açar; ızgara, büyütme, tek tek ve toptan silme.
+- Dönüşte otomatik gösterim: sen yokken çekilen fotoğraflar, yüzün tanınır tanınmaz "Buradayım" beklenmeden açılır (her fotoğraf bir kez).
+- Fotoğraf saklama süresi varsayılanı **1 gün** (1/7/30); budama açılışta, nöbet başında, galeri açılışında ve ayar değiştiğinde çalışır.

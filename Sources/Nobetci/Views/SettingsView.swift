@@ -62,10 +62,11 @@ struct SettingsView: View {
         Form {
             Toggle("Sen yokken yaklaşanların fotoğrafını çek", isOn: $settings.captureSnapshots)
             Picker("Saklama süresi", selection: $settings.snapshotRetentionDays) {
-                Text("7 gün").tag(7); Text("30 gün").tag(30); Text("90 gün").tag(90)
+                Text("1 gün").tag(1); Text("7 gün").tag(7); Text("30 gün").tag(30)
             }
             Text("Fotoğraflar şifrelenir ve yalnızca bu Mac'te kalır; internete gönderilmez.")
                 .font(.footnote).foregroundStyle(.secondary)
+            Button(L10n.t("photos.open"), systemImage: "photo.on.rectangle.angled") { model.openPhotoGallery() }
             Button("Tüm fotoğrafları sil", role: .destructive) { deletedPhotos = model.deleteAllSnapshots() }
             if let deletedPhotos {
                 Text("\(deletedPhotos) fotoğraf silindi.").font(.footnote).foregroundStyle(.secondary)

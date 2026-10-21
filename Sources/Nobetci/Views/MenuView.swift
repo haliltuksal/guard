@@ -31,6 +31,24 @@ struct MenuView: View {
             if case .guarding = model.state { sensorRow }
 
             Divider()
+            Button(action: { model.openPhotoGallery() }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                    Text(L10n.t("menu.photos"))
+                    Spacer()
+                    if model.photoCount > 0 {
+                        Text("\(model.photoCount)")
+                            .font(.caption).monospacedDigit()
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(.orange, in: Capsule())
+                            .foregroundStyle(.white)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain).font(.callout)
+
+            Divider()
             HStack {
                 Button(L10n.t("menu.settings.open")) { openSettings() }
                 Spacer()

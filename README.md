@@ -5,7 +5,7 @@ Masandan kalktığında Mac'ini **uyanık tutan**, başına **yabancı biri geç
 - 🔒 Yabancı yüz, yaklaşan kişi, kapak oynatma, Mac'i kaldırma, kamerayı kapatma, USB/ekran takma → **ekran bulanır, girdi kapanır**
 - 👤 Sadece **senin yüzün** (ya da uygulama şifren) açar
 - 🔋 Nöbet boyunca Mac **uyumaz**, ekran koruyucu devreye girmez
-- 📸 Sen yokken yaklaşanların **fotoğrafını çeker** — şifreli, yalnızca bu Mac'te; döndüğünde kimin geldiğini görürsün
+- 📸 Sen yokken yaklaşanların **fotoğrafını çeker** — şifreli, yalnızca bu Mac'te, **1 gün sonra silinir**; döndüğünde yüzün tanınır tanınmaz karşına gelir
 - 🕵️ **Hiçbir veri cihazından çıkmaz** — uygulamanın internet bağlantısı yoktur
 - 🧠 Yüz tanıma tamamen cihazda (Apple Neural Engine, ~1 ms)
 
@@ -35,7 +35,9 @@ Bitti. Menü çubuğunda bir **kalkan simgesi** göreceksin.
 | Geri döndüğünde | Kameraya bak → kilit **kendiliğinden** açılır; nöbet sürer |
 | Nöbeti bitirmek | Kalkan simgesi → **Buradayım** |
 | Yüz tanınmazsa | Kilit ekranında şifreni yaz, Return |
-| Sen yokken ne oldu? | "Buradayım" dediğinde olay listesi **ve çekilen fotoğraflar** açılır |
+| Kim yaklaşmış? | Menü → **Fotoğraflar** (yanındaki sayı kayıtlı fotoğraf adedi) |
+| Sen yokken ne oldu? | Döndüğünde fotoğraflar **kendiliğinden** açılır; ayrıca menüdeki **Fotoğraflar** düğmesinden her an bakabilirsin |
+| Nöbeti bitirince | "Buradayım" dediğinde olay listesi **ve fotoğraflar** birlikte açılır |
 
 Nöbetteyken menüde **kamera · kapak · hareket · uyanık** göstergeleri yanar.
 
@@ -54,7 +56,7 @@ Nöbetteyken menüde **kamera · kapak · hareket · uyanık** göstergeleri yan
 ## Gizlilik
 
 - Yüzünün **fotoğrafı değil**, sadece sayısal özellikleri saklanır; AES-GCM ile şifreli, anahtar Keychain'de, iCloud'a gitmez.
-- Sen yokken çekilen fotoğraflar AES-GCM ile **şifrelenir**, yalnızca bu Mac'te kalır ve saklama süresi dolunca silinir (varsayılan 30 gün). Ayarlar → Fotoğraflar'dan kapatabilir ya da hepsini silebilirsin.
+- Sen yokken çekilen fotoğraflar AES-GCM ile **şifrelenir**, yalnızca bu Mac'te kalır ve **varsayılan olarak 1 gün sonra silinir** (1/7/30 seçilebilir). Menü → **Fotoğraflar**'dan görür, tek tek ya da toptan silersin; Ayarlar → Fotoğraflar'dan tümüyle kapatabilirsin.
 - Yabancıların yüz verisi tanıma için **saklanmaz**.
 - Uygulamada **ağ kodu yok**.
 - Kilit ekranında "Kamera etkin" yazar; yaklaşan kişi kameranın açık olduğunu görür.
@@ -70,7 +72,7 @@ Xcode gerekmez; Command Line Tools + Swift 6 yeter. Yüz modeli için Python 3.1
 ```bash
 git clone https://github.com/haliltuksal/guard.git && cd guard
 make model      # FaceNet → Core ML (bir kez; ~1 dk, internet gerekir)
-make test       # 97 test (Swift Testing)
+make test       # 119 test (Swift Testing)
 make coverage   # NobetciCore ≥ %90 kapısı
 make cert       # kendinden imzalı kod imzalama kimliği (bir kez)
 make install    # /Applications/Nöbetçi.app

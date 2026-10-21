@@ -21,6 +21,9 @@ public struct GuardEngine: Sendable {
     private var strangerStreak = 0   // T1 debounce: ardışık yabancı/belirsiz kare sayısı
     private static let strangerFramesToLock = 2   // pipeline iz başına zamanlıyor; burası yalnızca tek-kare arıza koruması
     private var snapshotPolicy = SnapshotPolicy()
+    /// Sen yokken çekilip henüz sana gösterilmemiş fotoğraf sayısı. Döndüğünde
+    /// "Buradayım" demeni beklemeden gösterilir (kullanıcı isteği, 2026-10-21).
+    private var unseenSnapshots = 0
     private var lastBlinkPromptAt: TimeInterval = -.greatestFiniteMagnitude
     private static let promptStickiness: TimeInterval = 1.0   // "göz kırp" istemi tek kaçan karede düşmesin
 
@@ -72,6 +75,7 @@ public struct GuardEngine: Sendable {
         ownerPresence = OwnerPresence()
         ownerPresence.seedPresent(now: clock.now())
         snapshotPolicy.reset()
+        unseenSnapshots = 0
         state = .guarding(.present)
         var fx: [GuardEffect] = [.startSensors, .wakeKeep(true), .setInputPolicy(.passThrough)]
         fx.append(log(.guardStarted))
@@ -278,6 +282,7 @@ public struct GuardEngine: Sendable {
     private mutating func capture(_ reason: SnapshotReason, now: TimeInterval) -> [GuardEffect] {
         let urgent = reason == .wrongPasscode
         guard settings.captureSnapshots, snapshotPolicy.allow(now: now, urgent: urgent) else { return [] }
+        unseenSnapshots += 1
         return [.captureSnapshot(reason)]
     }
 
@@ -293,10 +298,20 @@ public struct GuardEngine: Sendable {
         return fx
     }
 
+    /// Sen yokken çekilenler varsa dönüşte hemen göster; her fotoğraf yalnızca bir kez.
+    private mutating func snapshotAlert() -> [GuardEffect] {
+        guard unseenSnapshots > 0 else { return [] }
+        let count = unseenSnapshots
+        unseenSnapshots = 0
+        return [.showSnapshots(count: count)]
+    }
+
     private mutating func ownerReturnedWhileUnlocked() -> [GuardEffect] {
         if settings.returnBehavior == .keepGuarding {
             state = .guarding(.present)
-            return [.setInputPolicy(.passThrough), log(.ownerReturned)]
+            var fx: [GuardEffect] = [.setInputPolicy(.passThrough), log(.ownerReturned)]
+            fx.append(contentsOf: snapshotAlert())
+            return fx
         }
         return endGuard(reason: .ownerReturned)
     }
@@ -310,6 +325,7 @@ public struct GuardEngine: Sendable {
             var fx: [GuardEffect] = [.hideShield, .setInputPolicy(.passThrough), .wakeKeep(true)]
             fx.append(log(kind))
             fx.append(persist(active: true))
+            fx.append(contentsOf: snapshotAlert())
             return fx
         }
         var effects: [GuardEffect] = [.hideShield]
@@ -320,6 +336,7 @@ public struct GuardEngine: Sendable {
 
     /// Nöbeti kapatır: oturumu bitirir, rapor gerekiyorsa gösterir, Kapalı'ya geçer.
     private mutating func endGuard(reason: GuardLogKind?) -> [GuardEffect] {
+        unseenSnapshots = 0            // rapor fotoğrafları zaten gösteriyor; çift pencere açma
         var effects: [GuardEffect] = []
         if let reason { effects.append(log(reason)) }
         if var s = session {

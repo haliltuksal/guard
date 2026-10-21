@@ -283,3 +283,90 @@ private func hasCapture(_ fx: [GuardEffect]) -> Bool {
     _ = e.handle(.command(.stopGuard))
     if case .locked = e.state {} else { Issue.record("kilitliyken durdurulamamalı") }
 }
+
+// Dönüşte "sen yokken bunlar oldu" — "Buradayım" beklemeden ------------------
+
+/// Sahibi t=`seen`'de görüp t=`gone`'da kadrajı boş bırakır (ikinci kez uzaklaşma).
+private func leaveAgain(_ e: inout GuardEngine, seen: TimeInterval, gone: TimeInterval) {
+    _ = e.handle(.frame(ownerFrame(at: seen)))
+    var empty = FrameSummary.empty
+    empty.timestamp = gone
+    _ = e.handle(.frame(empty))
+}
+
+/// Kilit yokken dönüş: OwnerPresence 3 ardışık sahip karesiyle izi yeniden doğrular.
+private func comeBack(_ e: inout GuardEngine, from t: TimeInterval) -> [GuardEffect] {
+    _ = e.handle(.frame(ownerFrame(at: t)))
+    _ = e.handle(.frame(ownerFrame(at: t + 0.1)))
+    return e.handle(.frame(ownerFrame(at: t + 0.2)))
+}
+
+private func personFrame(_ t: TimeInterval) -> FrameSummary {
+    var f = FrameSummary.empty; f.anyPersonPresent = true; f.timestamp = t; return f
+}
+
+private func snapshotAlertCount(_ fx: [GuardEffect]) -> Int? {
+    for case .showSnapshots(let n) in fx { return n }
+    return nil
+}
+
+@Test func showsSnapshotsWhenOwnerReturnsFromLock() {
+    // Sen yokken biri kadraja girdi → fotoğraf; sen dönünce yüzün tanınır tanınmaz görürsün.
+    var e = started()
+    leave(&e)
+    #expect(hasCapture(e.handle(.frame(personFrame(2.1)))))
+    _ = e.handle(.input)                                     // → locked
+    let fx = e.handle(.frame(ownerFrame(at: 6.0)))           // yüz tanındı
+    #expect(e.state == .guarding(.present))
+    #expect(snapshotAlertCount(fx) != nil)                   // nöbet sürerken bile gösterilir
+}
+
+@Test func showsSnapshotsWhenOwnerReturnsWithoutLock() {
+    // Kilit hiç devreye girmediyse de (yalnız kadrajda biri göründüyse) dönüşte gösterilir.
+    var e = started()
+    leave(&e)
+    _ = e.handle(.frame(personFrame(2.1)))
+    let fx = comeBack(&e, from: 3.0)
+    #expect(e.state == .guarding(.present))
+    #expect(snapshotAlertCount(fx) == 1)
+}
+
+@Test func noSnapshotAlertWhenNothingWasCaptured() {
+    // Kimse yaklaşmadıysa dönüşte pencere açılmaz.
+    var e = started()
+    leave(&e)
+    let fx = comeBack(&e, from: 3.0)
+    #expect(e.state == .guarding(.present))
+    #expect(snapshotAlertCount(fx) == nil)
+}
+
+@Test func snapshotAlertIsShownOnlyOncePerCapture() {
+    var e = started()
+    leave(&e)
+    _ = e.handle(.frame(personFrame(2.1)))
+    #expect(snapshotAlertCount(comeBack(&e, from: 3.0)) == 1)
+    leaveAgain(&e, seen: 4.0, gone: 6.0)                     // tekrar uzaklaş (kimse yaklaşmıyor)
+    #expect(snapshotAlertCount(comeBack(&e, from: 7.0)) == nil)   // aynı fotoğraf ikinci kez gösterilmez
+}
+
+@Test func passcodeUnlockAlsoShowsSnapshots() {
+    var e = started(verify: { $0 == "dogru" })
+    leave(&e)
+    _ = e.handle(.frame(personFrame(2.1)))
+    _ = e.handle(.input)                                     // locked
+    let fx = e.handle(.passcode("dogru"))
+    #expect(snapshotAlertCount(fx) != nil)
+}
+
+@Test func endingGuardDoesNotDuplicateAlertBesideReport() {
+    // "Buradayım" raporu fotoğrafları zaten içeriyor; ayrıca uyarı penceresi açılmamalı.
+    var e = started()
+    leave(&e)
+    _ = e.handle(.input)                                     // kilit (rapora konu olan olay)
+    _ = e.handle(.frame(ownerFrame(at: 3.0)))                // yüzle açıldı → bekleyenler gösterildi
+    leaveAgain(&e, seen: 4.0, gone: 6.0)
+    _ = e.handle(.frame(personFrame(6.1)))                   // yeni fotoğraf (gösterilmedi)
+    let fx = e.handle(.command(.stopGuard))
+    #expect(snapshotAlertCount(fx) == nil)
+    #expect(fx.contains { if case .showReport = $0 { return true }; return false })
+}

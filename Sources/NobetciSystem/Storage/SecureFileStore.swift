@@ -67,6 +67,11 @@ public struct SecureFileStore {
         }
     }
 
+    /// Tek bir şifreli dosyayı siler (yoksa sessizce geçer).
+    public func remove(name: String) {
+        try? fm.removeItem(at: directory.appendingPathComponent(name))
+    }
+
     /// Verilen önekli tüm şifreli dosyaları siler ve kaç tane silindiğini döndürür.
     @discardableResult
     public func removeAll(prefix: String) -> Int {

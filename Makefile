@@ -6,7 +6,7 @@ TESTFLAGS := -Xswiftc -F -Xswiftc $(CLT)/Library/Developer/Frameworks \
   -Xlinker -rpath -Xlinker $(CLT)/Library/Developer/usr/lib
 BIN := $(shell swift build --show-bin-path)
 
-.PHONY: build test coverage app cert dist install clean model eval
+.PHONY: build test coverage app cert dist install relaunch clean model eval
 
 build: ; swift build
 
@@ -35,3 +35,9 @@ clean: ; rm -rf .build build
 install: app
 	rm -rf "/Applications/Nöbetçi.app" && cp -R "build/Nöbetçi.app" /Applications/
 	@echo "kuruldu: /Applications/Nöbetçi.app"
+
+# Kurup yeniden başlatır. pkill -f yolu eşleştirmez (dosya adı NFD), ad ile öldür.
+relaunch: install
+	@pkill -x Nobetci 2>/dev/null || true
+	@sleep 1 && open -a "/Applications/Nöbetçi.app" && sleep 1
+	@echo "çalışıyor: pid=$$(pgrep -x Nobetci | head -1)"

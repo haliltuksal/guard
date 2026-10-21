@@ -707,7 +707,11 @@ Kullanıcı isteğiyle geri eklendi: "Uzaktayım aktifken ve ben yokken hareket 
 - **Ne zaman:** sahip yokken kadrajda kişi görülünce; her kilit tetikleyicisinde; yanlış şifrede. Sahip karşıdayken çekilmez.
 - **Hız sınırı:** en az 3 sn arayla, nöbet başına en fazla 50 (`SnapshotPolicy`, TDD).
 - **Nerede:** `~/Library/Application Support/Nöbetçi/snap-*.bin`, AES-GCM-256 şifreli (anahtar Keychain), ~720 px JPEG. **Ağ yok.**
-- **Saklama:** varsayılan 30 gün (7/30/90 seçilebilir); nöbet başında süresi dolanlar silinir. Ayarlar → Fotoğraflar'dan kapatma ve "tümünü sil".
-- **Görüntüleme:** "Buradayım" sonrası rapor penceresinde zaman ve sebep etiketli şerit.
+- **Saklama:** varsayılan **1 gün** (1/7/30 seçilebilir, kullanıcı kararı 2026-10-21); budama açılışta, nöbet başında, galeri açılışında ve ayar değişince çalışır. Künyeler `photos-index.bin` (AES-GCM) içinde tutulur; dizin kaybolursa dosya tarihine göre ikinci bir süpürme yapılır. Tavan: 500 künye.
+- **Görüntüleme (üç yol):**
+  1. **Dönüşte kendiliğinden:** sahip yokken çekilmiş ve henüz gösterilmemiş fotoğraf varsa, yüz (ya da şifre) ile kilit açılır açılmaz galeri açılır — "Buradayım" beklenmez (`GuardEffect.showSnapshots`). Her fotoğraf yalnızca bir kez gösterilir.
+  2. **Menü → Fotoğraflar:** tüm kayıtlı fotoğraflar, yeniden eskiye; düğmede adet rozeti.
+  3. **"Buradayım" raporu:** o nöbetin fotoğrafları olay çizelgesiyle birlikte (burada ayrıca uyarı penceresi açılmaz).
+- **Galeri:** ızgara, büyütme, tek tek silme, "tümünü sil" (onaylı), saklama süresi altbilgisi.
 - **Şeffaflık:** kalkan kartında "Kamera etkin" yazar; nöbet dışında kamera kapalıdır (yeşil ışık söner).
 - **Not:** Ortak/çalışma alanlarında üçüncü kişilerin görüntüsünü kaydetmek yerel mevzuata (ör. KVKK) tabi olabilir; özellik kullanıcı tercihiyle açıktır ve kapatılabilir.

@@ -48,7 +48,8 @@ public struct GuardSettings: Codable, Equatable, Sendable {
     public var requireBlink: Bool = false
     /// Sen yokken kadraja giren kişilerin fotoğrafı (şifreli, yalnızca cihazda, ağ yok).
     public var captureSnapshots: Bool = true
-    public var snapshotRetentionDays: Int = 30
+    /// Kullanıcı kararı (2026-10-21): yabancı fotoğrafları 1 gün sonra silinir.
+    public var snapshotRetentionDays: Int = 1
     public var historyRetentionDays: Int = 30
     public var startAtLogin: Bool = true
     public var hotKey: HotKeySpec = .default

@@ -23,7 +23,7 @@ public enum NotificationKind: Equatable, Sendable {
     case returned
 }
 
-/// Çekirdeğin ürettiği yan etkiler (spec §4.2). Fotoğraf ve "aktif gösterme" yok.
+/// Çekirdeğin ürettiği yan etkiler (spec §4.2). "Aktif gösterme" (sahte girdi) yok.
 public enum GuardEffect: Equatable, Sendable {
     case startSensors
     case stopSensors
@@ -34,6 +34,7 @@ public enum GuardEffect: Equatable, Sendable {
     case captureSnapshot(SnapshotReason)   // sen yokken yaklaşanın fotoğrafı (şifreli, yalnızca cihazda)
     case logEvent(GuardLogKind)
     case notify(NotificationKind)
+    case showSnapshots(count: Int)         // dönüşte: sen yokken çekilenleri hemen göster
     case showReport(SessionRecord)
     case persist(PersistedState)
 }

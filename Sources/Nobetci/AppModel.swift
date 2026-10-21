@@ -19,6 +19,8 @@ final class AppModel {
     var showingReport = false
     var needsSetup = false
     var prepareProblems: [String] = []
+    /// Menüdeki "Fotoğraflar" satırının sayacı.
+    var photoCount = 0
 
     struct SensorStatus: Equatable {
         var camera = false, lid = false, accelerometer = false, wakeKeep = false
@@ -34,6 +36,7 @@ final class AppModel {
     private let wakeKeeper = WakeKeeper()
     private let setupPresenter = WindowPresenter()
     private let reportPresenter = WindowPresenter()
+    private let photosPresenter = WindowPresenter()
     private var enrollment: EnrollmentSession?
     private let notifier = Notifier()
     private var inputFilter: InputFilter!
@@ -49,7 +52,14 @@ final class AppModel {
     private var passcodeBuffer = ""
     private var currentSession: SessionRecord?
     private var sessionSnapshots: [SnapshotRef] = []
+    /// Sen yokken çekilip henüz gösterilmemiş fotoğraflar (dönüşte açılacak pencere).
+    private var unseenSnapshots: [SnapshotRef] = []
+    /// Tüm nöbetlerden kalan fotoğrafların künye dizini (galeri bunu okur).
+    private var snapshotIndex = SnapshotIndex()
+    /// Galeride aynı anda çözülecek en fazla görüntü (bellek tavanı).
+    static let galleryLimit = 200
     static let snapshotPrefix = "snap-"
+    static let snapshotIndexFile = "photos-index.bin"
 
     // Seri olay kanalı: tüm kaynaklardan gelen olaylar FIFO sırayla motora ulaşır.
     private let events: AsyncStream<GuardEvent>
@@ -65,6 +75,8 @@ final class AppModel {
                                     dataKey: keys.data, settingsKey: keys.settings)
         settings = fileStore.readSettings()
         (events, eventSink) = AsyncStream<GuardEvent>.makeStream()
+        snapshotIndex = (try? fileStore.readEncrypted(SnapshotIndex.self, from: AppModel.snapshotIndexFile)) ?? SnapshotIndex()
+        pruneSnapshots()                     // açılışta süresi geçenleri at (nöbet beklemeden)
         needsSetup = !isEnrolled()
         configureAdapters()
         rebuildCoordinator()
@@ -176,6 +188,7 @@ final class AppModel {
         case .captureSnapshot(let reason): captureSnapshot(reason)
         case .logEvent(let kind): appendLog(kind)
         case .notify(let kind): notifier.post(kind)
+        case .showSnapshots: showUnseenSnapshots()
         case .showReport(let s):
             var merged = s
             merged.snapshots = sessionSnapshots      // fotoğraf künyeleri uygulama katmanında tutulur
@@ -187,7 +200,8 @@ final class AppModel {
 
     private func startSensors() {
         sessionSnapshots.removeAll()
-        fileStore.removeExpired(prefix: Self.snapshotPrefix, days: settings.snapshotRetentionDays)   // saklama süresi
+        unseenSnapshots.removeAll()
+        pruneSnapshots()                     // saklama süresi dolanları at
         buildPipelineAndCamera()
         camera?.start()
         lidSensor.start(); sensorStatus.lid = lidSensor.isAvailable
@@ -230,15 +244,20 @@ final class AppModel {
     private func captureSnapshot(_ reason: SnapshotReason) {
         guard settings.captureSnapshots, let jpeg = pipeline?.consumeSnapshot() else { return }
         let id = "\(Self.snapshotPrefix)\(Int(Date().timeIntervalSince1970 * 1000))"
+        let ref = SnapshotRef(id: id, at: Date(), reason: reason)
         do {
             try fileStore.writeEncrypted(jpeg, to: "\(id).bin")
-            sessionSnapshots.append(SnapshotRef(id: id, at: Date(), reason: reason))
+            sessionSnapshots.append(ref)
+            unseenSnapshots.append(ref)
+            for dropped in snapshotIndex.add(ref) { removeSnapshotFile(dropped.id) }   // tavan aşıldıysa en eskisi gider
+            saveSnapshotIndex()
+            photoCount = snapshotIndex.count
         } catch {
             // Disk dolu/yazılamıyor: koruma etkilenmez, fotoğraf atlanır.
         }
     }
 
-    /// Rapor için fotoğrafları çözer (şifreli dosyadan görüntüye).
+    /// Rapor ve galeri için fotoğrafları çözer (şifreli dosyadan görüntüye).
     func loadSnapshots(_ refs: [SnapshotRef]) -> [(ref: SnapshotRef, image: NSImage)] {
         refs.compactMap { ref in
             guard let data = try? fileStore.readEncrypted(Data.self, from: "\(ref.id).bin"),
@@ -247,9 +266,61 @@ final class AppModel {
         }
     }
 
+    /// Galerinin içeriği: tüm nöbetlerden kalan fotoğraflar, yeniden eskiye.
+    func allSnapshots() -> [(ref: SnapshotRef, image: NSImage)] {
+        pruneSnapshots()
+        return loadSnapshots(Array(snapshotIndex.newestFirst.prefix(Self.galleryLimit)))
+    }
+
+    /// Saklama süresi dolanları siler (künye + dosya) ve dizinde olmayan artıkları süpürür.
+    func pruneSnapshots() {
+        let dropped = snapshotIndex.prune(olderThan: settings.snapshotRetentionDays, now: Date())
+        for ref in dropped { removeSnapshotFile(ref.id) }
+        if !dropped.isEmpty { saveSnapshotIndex() }
+        // Dizin kaybolursa diskte öksüz dosya kalmasın (dosya tarihine göre ikinci süpürme).
+        fileStore.removeExpired(prefix: Self.snapshotPrefix, days: settings.snapshotRetentionDays)
+        sessionSnapshots.removeAll { ref in dropped.contains { $0.id == ref.id } }
+        unseenSnapshots.removeAll { ref in dropped.contains { $0.id == ref.id } }
+        photoCount = snapshotIndex.count
+    }
+
+    @discardableResult
+    func deleteSnapshot(id: String) -> Bool {
+        let removed = snapshotIndex.remove(id: id)
+        removeSnapshotFile(id)
+        sessionSnapshots.removeAll { $0.id == id }
+        unseenSnapshots.removeAll { $0.id == id }
+        if removed { saveSnapshotIndex() }
+        photoCount = snapshotIndex.count
+        return removed
+    }
+
+    @discardableResult
     func deleteAllSnapshots() -> Int {
         sessionSnapshots.removeAll()
+        unseenSnapshots.removeAll()
+        snapshotIndex.removeAll()
+        saveSnapshotIndex()
+        photoCount = 0
         return fileStore.removeAll(prefix: Self.snapshotPrefix)
+    }
+
+    private func removeSnapshotFile(_ id: String) {
+        fileStore.remove(name: "\(id).bin")
+    }
+
+    private func saveSnapshotIndex() {
+        try? fileStore.writeEncrypted(snapshotIndex, to: Self.snapshotIndexFile)
+    }
+
+    /// Sen yokken çekilenleri döndüğün anda gösterir ("Buradayım" beklemeden).
+    private func showUnseenSnapshots() {
+        pruneSnapshots()
+        let refs = unseenSnapshots
+        unseenSnapshots.removeAll()
+        let photos = loadSnapshots(refs)
+        guard !photos.isEmpty else { return }      // yazılamadıysa boş pencere açma
+        showPhotosWindow(photos, headline: L10n.t("photos.whileAway", "\(photos.count)"))
     }
 
     // MARK: Şifre
@@ -311,6 +382,17 @@ final class AppModel {
         }
     }
 
+    /// Menüdeki "Fotoğraflar" düğmesi: tüm kayıtlı fotoğraflar, yeniden eskiye.
+    func openPhotoGallery() {
+        showPhotosWindow(allSnapshots(), headline: nil)
+    }
+
+    private func showPhotosWindow(_ photos: [(ref: SnapshotRef, image: NSImage)], headline: String?) {
+        photosPresenter.show(title: L10n.t("photos.title"), size: NSSize(width: 560, height: 580)) {
+            PhotosView(model: self, photos: photos, headline: headline) { [weak self] in self?.photosPresenter.close() }
+        }
+    }
+
     private func showReportWindow(_ session: SessionRecord) {
         let photos = loadSnapshots(session.snapshots)
         reportPresenter.show(title: L10n.t("report.title"), size: NSSize(width: 520, height: 560)) {
@@ -364,6 +446,7 @@ final class AppModel {
     func update(_ newSettings: GuardSettings) {
         settings = newSettings
         try? fileStore.writeSettings(newSettings)
+        pruneSnapshots()                     // saklama süresi kısaldıysa hemen uygula
         try? hotKey.register(newSettings.hotKey)
         pipeline = nil   // bir sonraki nöbette yeni ayarla kurulur
         if case .off = state {
