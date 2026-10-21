@@ -50,6 +50,10 @@ public final class InputFilter: @unchecked Sendable {
     public func install() throws {
         guard stateLock.withLock({ taps.isEmpty }) else { return }
         guard Self.hasAccessibilityPermission(prompt: false) else { throw InputFilterError.accessibilityDenied }
+        // Etkin klavye düzenini her nöbet başında tazele (spec §7.3): düzen değiştiyse şifre karakterleri doğru çözülsün.
+        lock.withLock {
+            engine = InputPolicyEngine(translator: KeyTranslator.currentLayoutData().map { KeyTranslator(layoutData: $0) })
+        }
 
         let mask: CGEventMask = ~0   // tüm olay türleri
         let refcon = Unmanaged.passUnretained(self).toOpaque()

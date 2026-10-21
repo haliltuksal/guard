@@ -22,6 +22,16 @@ private let th = Thresholds(accept: 0.5, sustain: 0.4, reject: 0.3)
     #expect(m.classify([0.35, 0.9367], hasVerifiedTrack: false) == .uncertain) // reject ≤ 0.35 < accept
 }
 
+@Test func classifyFromPrecomputedScoreMatchesClassify() {
+    // Pipeline skoru bir kez hesaplayıp hem sınıflandırma hem "kabul seviyesinde mi" için kullanır.
+    let m = FaceMatcher(profile: [[1, 0]], thresholds: th)
+    for v: [Float] in [[1, 0], [0, 1], [0.35, 0.9367], [0.45, 0.893]] {
+        #expect(m.classify(score: m.score(v), hasVerifiedTrack: false) == m.classify(v, hasVerifiedTrack: false))
+        #expect(m.classify(score: m.score(v), hasVerifiedTrack: true) == m.classify(v, hasVerifiedTrack: true))
+    }
+    #expect(m.thresholds.accept == 0.5)
+}
+
 @Test func sustainThresholdHoldsVerifiedTrack() {
     let m = FaceMatcher(profile: [[1, 0]], thresholds: th)
     let v: [Float] = [0.45, 0.893]   // cos ≈ 0.45: accept(0.5) altında, sustain(0.4) üstünde

@@ -60,7 +60,7 @@ final class ShieldWindow: NSWindow {
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.25
             old.forEach { $0.animator().alphaValue = 0 }
-        }, completionHandler: { old.forEach { $0.orderOut(nil) } })
+        }, completionHandler: { MainActor.assumeIsolated { old.forEach { $0.orderOut(nil) } } })
     }
 
     private func rebuildIfShowing() { if isShowing { rebuild() } }

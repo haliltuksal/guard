@@ -238,15 +238,15 @@ final class AppModel {
         currentSession = nil
     }
 
+    /// Çalışma durumu + yanlış şifre sayacı Keychain'de (spec §9.1): düz dosyada değil,
+    /// yeniden başlatmada da korunur (sayaç oynanamaz, sıfırlanmaz).
     private func persist(_ p: PersistedState) {
-        if let data = try? JSONEncoder().encode(p) {
-            try? data.write(to: SecureFileStore.defaultDirectory().appendingPathComponent("state.json"), options: .atomic)
-        }
+        if let data = try? JSONEncoder().encode(p) { try? keychain.set(data, account: "guardState") }
     }
 
     private func bootRecovery() {
-        let url = SecureFileStore.defaultDirectory().appendingPathComponent("state.json")
-        let previous = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(PersistedState.self, from: $0) }
+        let previous = keychain.get(account: "guardState")
+            .flatMap { try? JSONDecoder().decode(PersistedState.self, from: $0) }
         send(.launched(bootSession: BootSession.current(), previous: previous))
     }
 
@@ -255,7 +255,7 @@ final class AppModel {
     func enroll(profile: [[Float]], passcode: String) throws {
         try fileStore.writeEncrypted(profile, to: "profile.bin")
         let salt = AppModel.randomBytes(16)
-        let rounds = 600_000
+        let rounds = PasscodeHasher.calibratedRounds(targetSeconds: 0.25, floor: 600_000)   // spec §9.2
         let hash = PasscodeHasher.hash(passcode, salt: salt, rounds: rounds)
         let record = PasscodeRecord(salt: salt, rounds: rounds, hash: hash)
         try keychain.set(try JSONEncoder().encode(record), account: "passcode")
@@ -313,7 +313,7 @@ final class AppModel {
     /// Nöbetçi'yi tümüyle kaldırır: launchd kaydı, Keychain kayıtları ve tüm veri.
     func uninstall() {
         try? LaunchAgent.unregister()
-        for account in ["passcode", "dataKey", "settingsKey"] { try? keychain.delete(account: account) }
+        for account in ["passcode", "dataKey", "settingsKey", "guardState"] { try? keychain.delete(account: account) }
         try? fileStore.removeAll()
         NSApp.terminate(nil)
     }

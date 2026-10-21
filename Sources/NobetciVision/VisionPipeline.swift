@@ -136,12 +136,15 @@ public final class VisionPipeline: @unchecked Sendable {
                 if !isOwnerTrack { flag(threats.observe(trackID: ids[i], belowReject: false, now: now)) }
                 continue
             }
-            switch matcher.classify(vector, hasVerifiedTrack: ownerTrackRecent) {
+            let score = matcher.score(vector)
+            switch matcher.classify(score: score, hasVerifiedTrack: ownerTrackRecent) {
             case .owner:
                 ownerFace = face
                 ownerTrackID = ids[i]
                 ownerTrackLastSeen = now
-                ownerRecognitions.add(now)
+                // Kilit açma penceresine yalnızca T_kabul üstü kareler girer (spec §5.4.1); sürdürme
+                // eşiğiyle geçen kötü-açı kareleri varlığı korur ama kilidi tek başına açmaz.
+                if score >= matcher.thresholds.accept { ownerRecognitions.add(now) }
                 threats.clear(trackID: ids[i])
             case .stranger:
                 if !isOwnerTrack { flag(threats.observe(trackID: ids[i], belowReject: true, now: now)) }

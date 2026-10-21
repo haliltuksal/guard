@@ -99,3 +99,4 @@ Her satır çalıştırıldığında ölçümüyle buraya yazılacak.
 | Gece odası | parlaklık 0,29, doku 0,04 → "loş" eşiği 0,2, doku 0,01 (örtülü değil) |
 | Dönüş davranışı | Kullanıcı kararı: varsayılan **nöbet sürsün**; durdurma = "Buradayım" |
 | Yabancı yüzde blur gecikmesi | Kullanıcı: "biraz geç". Zincir: durgun sahnede 0,5 sn analiz aralığı + 0,5 sn belirsiz kabul + motor 3 kare. → Kişi görünür görünmez her kare analiz; kabul 0,3 sn; motor 2 kare; yüz varken gövde taraması atlanır (kare başı süre ↓). Ölçülecek. |
+| Bütünsel bakış (2026-10-21) | Uyarı 0. Ertelenen küçükler kapatıldı: #8 lockout→Keychain, #10 düzen tazeleme, #12 PBKDF2 kalibrasyon, #13 kabul-seviyesi pencere. Kalan: #11 kesilen oturum raporu (düşük). |

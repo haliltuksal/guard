@@ -18,6 +18,13 @@ import Foundation
     #expect(a != b)
 }
 
+@Test func calibratedRoundsRespectFloor() {
+    // Spec §9.2: tur sayısı bu Mac'te ~250 ms sürecek şekilde ölçülür; alt sınır 600.000.
+    let rounds = PasscodeHasher.calibratedRounds(targetSeconds: 0.25, floor: 600_000)
+    #expect(rounds >= 600_000)
+    #expect(rounds <= 100_000_000)
+}
+
 // MARK: LockoutPolicy (Review Focus 4: yalnızca monoton saat)
 
 @Test func lockoutUsesMonotonicClockOnly() {

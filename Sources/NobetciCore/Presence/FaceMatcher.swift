@@ -18,7 +18,7 @@ public struct Thresholds: Sendable, Equatable {
 /// Bir yüz vektörünü sahip profiliyle karşılaştırır.
 public struct FaceMatcher: Sendable {
     private let profile: [[Float]]
-    private let thresholds: Thresholds
+    public let thresholds: Thresholds
 
     public init(profile: [[Float]], thresholds: Thresholds) {
         self.profile = profile
@@ -35,7 +35,11 @@ public struct FaceMatcher: Sendable {
 
     /// Histerezis: doğrulanmış bir sahip izi varsa `sustain`, yoksa `accept` eşiği uygulanır.
     public func classify(_ v: [Float], hasVerifiedTrack: Bool) -> MatchResult {
-        let s = score(v)
+        classify(score: score(v), hasVerifiedTrack: hasVerifiedTrack)
+    }
+
+    /// Önceden hesaplanmış skorla sınıflandırma (pipeline skoru bir kez hesaplar).
+    public func classify(score s: Float, hasVerifiedTrack: Bool) -> MatchResult {
         let acceptThreshold = hasVerifiedTrack ? thresholds.sustain : thresholds.accept
         if s >= acceptThreshold { return .owner }
         if s < thresholds.reject { return .stranger }
