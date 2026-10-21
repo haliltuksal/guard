@@ -87,4 +87,4 @@ Tasarım: `docs/superpowers/specs/` · Plan: `docs/superpowers/plans/` · Model:
 
 İlkeler: üçüncü parti çalışma zamanı bağımlılığı yok · ağ yok · fotoğraf yok · sahte etkinlik yok · emin olunamayan her durumda kilitle.
 
-**Lisans notu:** Yüz modeli ağırlıkları (VGGFace2 üzerinde eğitilmiş FaceNet) ticari olmayan kullanım içindir.
+**Lisans:** Kod [MIT](LICENSE). Yüz modeli ağırlıkları (VGGFace2 üzerinde eğitilmiş FaceNet) ayrıca ticari olmayan kullanım koşuluna tabidir; `make model` bunları ayrıca indirir, depoda yer almaz.
