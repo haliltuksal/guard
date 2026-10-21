@@ -2,7 +2,9 @@
 
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/), sürümleme [SemVer](https://semver.org/lang/tr/).
 
-## [Yayınlanmamış]
+## [0.1.2] — 2026-10-21
+
+Tek bir kök nedenin çözümü: yüzün okunamadığı anlarda artık "masadan kalktın" sayılmıyor.
 
 ### Düzeltilenler
 - **Yanlış "sahip yok" kararı kökten çözüldü (kimlik çapası).** Telefona bakmak, burun
