@@ -1,7 +1,7 @@
 import SwiftUI
 import NobetciCore
 
-/// "Sen yokken olanlar" raporu: özet + olay zaman çizelgesi (fotoğraf yok).
+/// "Sen yokken olanlar" raporu: özet, olay zaman çizelgesi ve çekilen fotoğraflar.
 struct ReportView: View {
     let session: SessionRecord
     var photos: [(ref: SnapshotRef, image: NSImage)] = []

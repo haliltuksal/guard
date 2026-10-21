@@ -87,6 +87,6 @@ swift run nobetci-eval live 10   # kamera ile tanıma/eşik tanılaması
 
 Tasarım: `docs/superpowers/specs/` · Plan: `docs/superpowers/plans/` · Model: `docs/model-evaluation.md` · Doğrulama: `docs/test-report.md`
 
-İlkeler: üçüncü parti çalışma zamanı bağımlılığı yok · ağ yok · fotoğraf yok · sahte etkinlik yok · emin olunamayan her durumda kilitle.
+İlkeler: üçüncü parti çalışma zamanı bağımlılığı yok · ağ yok · fotoğraf yalnızca cihazda ve şifreli · sahte etkinlik yok · emin olunamayan her durumda kilitle.
 
 **Lisans:** Kod [MIT](LICENSE). Yüz modeli ağırlıkları (VGGFace2 üzerinde eğitilmiş FaceNet) ayrıca ticari olmayan kullanım koşuluna tabidir; `make model` bunları ayrıca indirir, depoda yer almaz.
