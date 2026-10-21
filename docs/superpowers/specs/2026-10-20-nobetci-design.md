@@ -715,3 +715,43 @@ Kullanıcı isteğiyle geri eklendi: "Uzaktayım aktifken ve ben yokken hareket 
 - **Galeri:** ızgara, büyütme, tek tek silme, "tümünü sil" (onaylı), saklama süresi altbilgisi.
 - **Şeffaflık:** kalkan kartında "Kamera etkin" yazar; nöbet dışında kamera kapalıdır (yeşil ışık söner).
 - **Not:** Ortak/çalışma alanlarında üçüncü kişilerin görüntüsünü kaydetmek yerel mevzuata (ör. KVKK) tabi olabilir; özellik kullanıcı tercihiyle açıktır ve kapatılabilir.
+
+
+## 18. Kimlik çapası — yanlış "sahip yok" kararının kökten çözümü (2026-10-21)
+
+**Belirti (cihazda, kullanıcı kanıtı):** Kullanıcı masasında otururken telefonuna baktığında
+uygulama (a) ekranı "girdi" sebebiyle kilitliyor, (b) bir dakika boyunca kullanıcının *kendi*
+yüzünü "kadrajda yabancı" diye fotoğraflıyordu (12 kare, 16:44:32–16:45:35).
+
+**Kök neden:** Varlık kararı yalnızca "bu karede yüz eşleşti mi" sorusuna bağlıydı.
+`OwnerPresence` 1,5 sn tanıma göremeyince `absent`'e düşüyordu; `VisionPipeline`'daki iz
+hafızası da 1,5 sn ile sınırlıydı. Oysa telefona bakmak, burun kaşımak, başı çevirmek yüzü
+saniyelerce *okunamaz* yapar — ama kişi masadadır. Sistem "yüzünü okuyamıyorum" ile
+"masadan kalktın" arasında ayrım yapmıyordu.
+
+**Çözüm — kimlik çapası (`OwnerAnchor`):** Kimlik kare kare tanımaya değil, kesintisiz **ize**
+bağlanır. Üç kademe:
+1. **Tanıma** — yüz eşleşti: çapa bu ize bağlanır (en güçlü kanıt, varlığı *kurar*).
+2. **İz** — aynı iz görülmeye devam ediyor, tanınmasa bile: sahip hâlâ orada.
+3. **Taşıma** — yüz hiç görünmüyor ama sahne boşalmadı (gövde var): `carryLimit` (10 dk) kadar.
+
+Çapa koptuktan sonra aynı yerde (IoU ≥ 0,2) 1,5 sn içinde beliren yüz, sahibin devamı sayılır
+(el yüzü kapatır, kafa bir an kadrajdan çıkar).
+
+**Okunabilirlik ilkesi:** *Okunamayan yüzden kimlik kararı çıkarılmaz.* Dik açılı (|yaw| > 0,70,
+|pitch| > 0,50 rad) ya da kalitesi 0,15 altı yüz ne "sahip" ne "yabancı"dır. Sahibin izinde
+okunamayan bir yüz çapayı sürdürür; **okunabilir** ve kesin yabancı (skor < reject) bir yüz ise
+çapayı düşürür ve tehdit sayılır (koltuk el değiştirme senaryosu).
+
+**Güvenlik dengesi:**
+- Düşük (sürdürme) eşiği artık **yalnızca sahibin izindeki** yüze uygulanır. Çapa uzun yaşadığı
+  için bunu tüm yüzlere açmak, 0,55–0,70 arası skorlayan bir yabancıyı "sahip" sayardı.
+- Çapa canlıyken kadrajdaki gövde/kişi sahibin kendisidir: T2 (yüzsüz kişi) tetiklenmez ve
+  fotoğraf çekilmez.
+- Yabancı yüz tetikleyicisi (T1), kapak, hareket, kamera ve girdi tetikleyicileri aynen durur;
+  çapa yalnızca "sahip burada mı" sorusunu yanıtlar.
+- Artık kalan risk: sahne hiç boşalmadan koltuğun el değiştirmesi *ve* yeni kişinin yüzünü hiç
+  okunabilir göstermemesi. `carryLimit` bunu 10 dakikayla sınırlar.
+
+**Doğrulama:** `swift run nobetci-eval presence 30` — sahip okunmayan karelerde iz/gövde
+kapsamasını ve poz dağılımını ölçer; okunabilirlik eşikleri bu çıktıyla kalibre edilir.

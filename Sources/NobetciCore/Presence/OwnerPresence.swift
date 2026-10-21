@@ -24,7 +24,10 @@ public struct OwnerPresence: Sendable {
         awaitingFirstObservation = true
     }
 
-    public mutating func update(match: MatchResult, trackAlive: Bool, now: TimeInterval) -> Presence {
+    /// `anchored`: sahibin kimlik çapası canlı (aynı iz sürüyor ya da sahne boşalmadı).
+    /// Çapa, doğrulanmış varlığı taze tutar: "yüzünü okuyamıyorum" ile "gittin" aynı şey
+    /// değildir. Çapa tek başına varlık kurmaz — yalnızca var olanı sürdürür.
+    public mutating func update(match: MatchResult, trackAlive: Bool, anchored: Bool = false, now: TimeInterval) -> Presence {
         if awaitingFirstObservation {
             // Tohum ile ilk gözlem arasındaki süre (asenkron kamera açılışı, ~1–2 sn) varlığı
             // eskitmez; zaman aşımı saati ilk gözlemde başlar.
@@ -41,6 +44,7 @@ public struct OwnerPresence: Sendable {
         } else {
             consecutiveOwnerFrames = 0
         }
+        if verified, anchored { lastOwnerSeen = now }   // çapa: tanıma olmasa da sahip orada
         if verified, now - lastOwnerSeen <= Self.absenceTimeout {
             return .present
         }

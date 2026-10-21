@@ -370,3 +370,69 @@ private func snapshotAlertCount(_ fx: [GuardEffect]) -> Int? {
     #expect(snapshotAlertCount(fx) == nil)
     #expect(fx.contains { if case .showReport = $0 { return true }; return false })
 }
+
+// Yanlış "sahip yok" kararı (cihazda yaşandı: telefona bakarken kilit + yabancı sanma) ---
+
+/// Sahip kadrajda ama yüzü okunmuyor: iz/çapa canlı, tanıma yok.
+private func unreadableOwnerFrame(at t: TimeInterval) -> FrameSummary {
+    var f = FrameSummary.empty
+    f.ownerAnchored = true          // çapa: aynı iz görülüyor
+    f.anyPersonPresent = true
+    f.timestamp = t
+    f.sceneEmptyFor = 0
+    return f
+}
+
+@Test func lookingDownAtPhoneDoesNotMakeOwnerAbsent() {
+    var e = started()
+    _ = e.handle(.frame(ownerFrame(at: 0)))
+    var t = 0.0
+    while t < 60 { t += 0.2; _ = e.handle(.frame(unreadableOwnerFrame(at: t))) }
+    #expect(e.state == .guarding(.present))   // bir dakika telefona bakmak "gitti" demek değil
+}
+
+@Test func inputWhileLookingDownDoesNotLock() {
+    // Cihazda yaşanan tam senaryo: telefona bakarken klavyeye dokununca kilitleniyordu.
+    var e = started()
+    _ = e.handle(.frame(ownerFrame(at: 0)))
+    var t = 0.0
+    while t < 10 { t += 0.2; _ = e.handle(.frame(unreadableOwnerFrame(at: t))) }
+    #expect(e.handle(.input).isEmpty)
+}
+
+@Test func noSnapshotsOfOwnerWhileAnchored() {
+    // "kadrajda" diye sahibin kendi fotoğrafı çekilmemeli.
+    var e = started()
+    _ = e.handle(.frame(ownerFrame(at: 0)))
+    var t = 0.0
+    var captures = 0
+    while t < 30 {
+        t += 0.2
+        if hasCapture(e.handle(.frame(unreadableOwnerFrame(at: t)))) { captures += 1 }
+    }
+    #expect(captures == 0)
+}
+
+@Test func anchorDoesNotBlockRealAbsence() {
+    // Çapa kopunca (sahne boşaldı) eski davranış sürer: girdi kilitler.
+    var e = started()
+    _ = e.handle(.frame(ownerFrame(at: 0)))
+    _ = e.handle(.frame(unreadableOwnerFrame(at: 1.0)))
+    var gone = FrameSummary.empty
+    gone.timestamp = 3.0                       // çapa yok, kimse yok
+    _ = e.handle(.frame(gone))
+    #expect(e.state == .guarding(.absent))
+    #expect(contains(e.handle(.input), lock: .input))
+}
+
+@Test func strangerStillLocksWhileOwnerAnchored() {
+    // Çapa güvenliği gevşetmez: okunabilir yabancı yüz yine kilitler.
+    var e = started()
+    _ = e.handle(.frame(ownerFrame(at: 0)))
+    var f = unreadableOwnerFrame(at: 1.0)
+    f.strangerFacePresent = true
+    _ = e.handle(.frame(f))
+    var g = unreadableOwnerFrame(at: 1.2)
+    g.strangerFacePresent = true
+    #expect(contains(e.handle(.frame(g)), lock: .strangerFace))
+}

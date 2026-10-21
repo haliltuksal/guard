@@ -2,6 +2,23 @@
 
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/), sürümleme [SemVer](https://semver.org/lang/tr/).
 
+## [Yayınlanmamış]
+
+### Düzeltilenler
+- **Yanlış "sahip yok" kararı kökten çözüldü (kimlik çapası).** Telefona bakmak, burun
+  kaşımak ya da başı çevirmek yüzü saniyelerce okunamaz yapıyor; eski mantık bunu "masadan
+  kalktı" sayıp girdi gelince ekranı kilitliyor, kullanıcının kendi yüzünü "yaklaşan yabancı"
+  diye fotoğraflıyordu. Kimlik artık kare kare tanımaya değil kesintisiz **ize** bağlı
+  (`OwnerAnchor`): tanıma → iz → gövdeyle taşıma. Ayrıntı: spec §18.
+- **Okunamayan yüzden kimlik kararı çıkarılmıyor.** Dik açılı ya da bulanık yüz ne "sahip"
+  ne "yabancı" sayılır (`FaceReadability`).
+- Sürdürme eşiği yalnızca sahibin izindeki yüze uygulanıyor (yabancıya uygulanması
+  0,55–0,70 arası skoru "sahip" yapardı).
+- Çapa canlıyken sahibin kendi gövdesi "yüzsüz kişi" sayılmıyor ve fotoğrafı çekilmiyor.
+
+### Eklenenler
+- `nobetci-eval presence [sn]`: sahip okunmayan karelerde iz/gövde kapsaması ve poz dağılımı.
+
 ## [0.1.1] — 2026-10-21
 
 Sen yokken kimlerin yaklaştığını görmek için fotoğraf katmanı. 119 test, derleme

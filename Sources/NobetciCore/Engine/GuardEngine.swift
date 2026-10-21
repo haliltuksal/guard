@@ -101,16 +101,21 @@ public struct GuardEngine: Sendable {
             }
             let ownerThisFrame = f.ownerTrack?.present == true
             let match: MatchResult = ownerThisFrame ? .owner : .uncertain
-            let newPresence = ownerPresence.update(match: match, trackAlive: f.ownerTrack != nil, now: f.timestamp)
+            let newPresence = ownerPresence.update(match: match, trackAlive: f.ownerTrack != nil,
+                                                   anchored: f.ownerAnchored, now: f.timestamp)
 
             if presence == .absent {
                 // T2: sahne ≥ 3 sn boşken beliren yüzsüz gövde (Review Focus 1).
-                if settings.facelessDetection, f.bodyPresentBeyondThreshold, !ownerThisFrame, f.sceneEmptyFor >= 3 {
+                if settings.facelessDetection, f.bodyPresentBeyondThreshold, !ownerThisFrame,
+                   !f.ownerAnchored, f.sceneEmptyFor >= 3 {
                     return lock(.facelessPerson, now: f.timestamp, bystander: true)
                 }
                 if newPresence == .present { return ownerReturnedWhileUnlocked() }
                 // Sen yokken kadraja giren kişinin fotoğrafı (hız sınırlı).
-                if f.anyPersonPresent, !ownerThisFrame { return capture(.personSeen, now: f.timestamp) }
+                // Çapa canlıyken kadrajdaki kişi sahibin kendisidir: kendi fotoğrafını çekme.
+                if f.anyPersonPresent, !ownerThisFrame, !f.ownerAnchored {
+                    return capture(.personSeen, now: f.timestamp)
+                }
                 return []
             } else {
                 // present → absent
@@ -130,7 +135,7 @@ public struct GuardEngine: Sendable {
     private mutating func faceUnlockAttempt(_ f: FrameSummary) -> [GuardEffect] {
         // Kilitliyken kadrajdaki kişi sen değilsen fotoğrafla (hız sınırlı).
         var captured: [GuardEffect] = []
-        if f.anyPersonPresent, f.ownerTrack?.present != true {
+        if f.anyPersonPresent, f.ownerTrack?.present != true, !f.ownerAnchored {
             captured = capture(.personSeen, now: f.timestamp)
         }
         if !captured.isEmpty { return captured + faceUnlockDecision(f) }

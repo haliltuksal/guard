@@ -41,3 +41,34 @@ import Testing
     #expect(p.update(match: .uncertain, trackAlive: false, now: 2.0) == .absent) // 1,5 sn sonra → absent
     #expect(!p.hasVerifiedTrack)
 }
+
+// Çapa: yüz okunamasa da sahip oradaysa varlık düşmez (telefona bakma, burun kaşıma).
+
+@Test func anchorKeepsPresenceWithoutAnyMatch() {
+    var p = OwnerPresence()
+    p.seedPresent(now: 0)
+    var t = 0.0
+    while t < 60 {
+        t += 0.1
+        let presence = p.update(match: .uncertain, trackAlive: false, anchored: true, now: t)
+        #expect(presence == .present)      // çapa taze tutar
+    }
+}
+
+@Test func presenceDropsAfterAnchorBreaks() {
+    var p = OwnerPresence()
+    p.seedPresent(now: 0)
+    _ = p.update(match: .uncertain, trackAlive: false, anchored: true, now: 5.0)
+    #expect(p.update(match: .uncertain, trackAlive: false, anchored: false, now: 6.0) == .present)   // 1,5 sn dolmadı
+    #expect(p.update(match: .uncertain, trackAlive: false, anchored: false, now: 6.6) == .absent)    // doldu
+}
+
+@Test func anchorDoesNotResurrectPresenceAfterRealAbsence() {
+    // Çapa kopmuş ve sahip yok sayılmışken, geç gelen bir "anchored" karesi tek başına
+    // sahibi geri getirmemeli — geri dönüş yalnızca tanımayla olur.
+    var p = OwnerPresence()
+    p.seedPresent(now: 0)
+    _ = p.update(match: .owner, trackAlive: true, anchored: true, now: 0)   // ilk gözlem (tohum eskimesin)
+    #expect(p.update(match: .uncertain, trackAlive: false, anchored: false, now: 2.0) == .absent)
+    #expect(p.update(match: .uncertain, trackAlive: false, anchored: true, now: 2.1) == .absent)
+}

@@ -16,6 +16,9 @@ public struct OwnerTrackState: Equatable, Sendable {
 /// `strangerFacePresent`/`bodyPresentBeyondThreshold` sahibin kendisini saymaz.
 public struct FrameSummary: Equatable, Sendable {
     public var ownerTrack: OwnerTrackState?
+    /// Sahibin kimlik çapası canlı mı: aynı iz görülmeye devam ediyor ya da sahne
+    /// hiç boşalmadı. Yüz okunmasa bile "sahip masada" demektir (bkz `OwnerAnchor`).
+    public var ownerAnchored: Bool
     public var strangerFacePresent: Bool
     public var uncertainFacePresent: Bool
     public var bodyPresentBeyondThreshold: Bool
@@ -30,6 +33,7 @@ public struct FrameSummary: Equatable, Sendable {
 
     public init(
         ownerTrack: OwnerTrackState? = nil,
+        ownerAnchored: Bool = false,
         strangerFacePresent: Bool = false,
         uncertainFacePresent: Bool = false,
         bodyPresentBeyondThreshold: Bool = false,
@@ -41,6 +45,7 @@ public struct FrameSummary: Equatable, Sendable {
         timestamp: TimeInterval = 0
     ) {
         self.ownerTrack = ownerTrack
+        self.ownerAnchored = ownerAnchored
         self.strangerFacePresent = strangerFacePresent
         self.uncertainFacePresent = uncertainFacePresent
         self.bodyPresentBeyondThreshold = bodyPresentBeyondThreshold

@@ -38,3 +38,11 @@ private let th = Thresholds(accept: 0.5, sustain: 0.4, reject: 0.3)
     #expect(m.classify(v, hasVerifiedTrack: false) == .uncertain)  // ilk tanıma: accept gerekir
     #expect(m.classify(v, hasVerifiedTrack: true) == .owner)       // sürdürme: sustain yeter
 }
+
+@Test func sustainThresholdOnlyAppliesToTheOwnTrack() {
+    // Sürdürme eşiği kimlik sürekliliğine aittir: yabancı bir yüze uygulanırsa
+    // 0,55–0,70 arası skorlayan biri "sahip" sayılır.
+    let m = FaceMatcher(profile: [[1, 0, 0]], thresholds: Thresholds(accept: 0.70, sustain: 0.55, reject: 0.40))
+    #expect(m.classify(score: 0.60, hasVerifiedTrack: true) == .owner)       // sahip izi
+    #expect(m.classify(score: 0.60, hasVerifiedTrack: false) == .uncertain)  // başka iz
+}

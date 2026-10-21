@@ -64,9 +64,8 @@ public final class VisionPipeline: @unchecked Sendable {
     private var previousShiftBuffer: CVPixelBuffer?
     private var coveredDebounce = CoveredDebouncer()
     private var threats = ThreatTracker()
-    private var ownerTrackID: Int?
-    private var ownerTrackLastSeen: TimeInterval = -.greatestFiniteMagnitude
-    private static let ownerTrackMemory: TimeInterval = 1.5
+    /// Sahip kimliğinin çapası (bkz `OwnerAnchor`): tanıma kaybolsa da iz sürdükçe sahip oradadır.
+    private var anchor = OwnerAnchor()
 
     private let stateLock = NSLock()
     private var _requestedTurn: Turn?
@@ -133,8 +132,20 @@ public final class VisionPipeline: @unchecked Sendable {
         // değildir (ölçüldü: kafa çevirince 263 karenin 12'si 0,70 altı). Tehdit yalnızca
         // FARKLI bir izdir. Sahip izi 1,5 sn hatırlanır; sürdürme eşiği de buna bağlıdır.
         let ids = tracker.updateAssigning(boxes: detections.faces.map(\.boundingBox), now: now).ids
-        let ownerTrackRecent = ownerTrackID != nil && now - ownerTrackLastSeen <= Self.ownerTrackMemory
         threats.retain(onlyIDs: Set(ids))
+
+        // Bu karedeki hangi yüz sahibin izi? Önce aynı iz; iz koptuysa aynı yerde beliren
+        // yüz (el çekildi, kafa geri geldi) — kimlik sürekliliği, tanıma şartı yok.
+        var ownerIndex: Int?
+        if anchor.isAlive(now: now) {
+            if let id = anchor.trackID, let i = ids.firstIndex(of: id) {
+                ownerIndex = i
+            } else if let i = detections.faces.firstIndex(where: { anchor.canRebind(to: $0.boundingBox, now: now) }) {
+                anchor.rebind(trackID: ids[i], box: detections.faces[i].boundingBox, now: now)
+                ownerIndex = i
+            }
+        }
+        let anchoredAtStart = anchor.isAlive(now: now)   // eşik histerezisi kare boyunca sabit
 
         // T1 zamanlaması iz başına: belirsiz → 0,3 sn kabul süresi; yabancı → 3 ardışık T_red altı.
         func flag(_ r: (uncertain: Bool, stranger: Bool)) {
@@ -145,37 +156,61 @@ public final class VisionPipeline: @unchecked Sendable {
         var ownerTrackFace: DetectedFace?   // sahip izindeki yüz (bu karede eşleşmese de): kırpma/kalite buradan okunur
 
         for (i, face) in detections.faces.enumerated() where face.boundingBox.height >= config.minFaceHeight {
-            let isOwnerTrack = ownerTrackRecent && ids[i] == ownerTrackID
+            let isOwnerTrack = ownerIndex == i
             if isOwnerTrack { ownerTrackFace = face }
+            // Okunamayan yüzden kimlik kararı çıkarılmaz: dik açı/bulanıklık ne "sahip"
+            // ne "yabancı" demektir. Sahibin telefona bakan yüzü buradan geçer.
+            let readable = FaceReadability.isReadable(yaw: face.yaw, pitch: face.pitch, quality: face.quality)
             guard face.landmarks5.count == 5,
                   let aligned = alignedFace(pixelBuffer: pixelBuffer, face: face, imageW: w, imageH: h),
                   let vector = try? embedder.embed(aligned) else {
-                if !isOwnerTrack { flag(threats.observe(trackID: ids[i], belowReject: false, now: now)) }
+                if isOwnerTrack { anchor.sustain(box: face.boundingBox, now: now) }
+                else { flag(threats.observe(trackID: ids[i], belowReject: false, now: now)) }
                 continue
             }
             let score = matcher.score(vector)
-            switch matcher.classify(score: score, hasVerifiedTrack: ownerTrackRecent) {
+            // Düşük (sürdürme) eşiği YALNIZCA sahibin izindeki yüze uygulanır. Çapa uzun
+            // yaşadığı için bunu tüm yüzlere açmak, 0,55–0,70 arası skorlayan bir yabancıyı
+            // "sahip" sayardı; başka her yüz kabul eşiğine tabidir.
+            switch matcher.classify(score: score, hasVerifiedTrack: anchoredAtStart && isOwnerTrack) {
             case .owner:
                 ownerFace = face
-                ownerTrackID = ids[i]
-                ownerTrackLastSeen = now
+                anchor.verify(trackID: ids[i], box: face.boundingBox, now: now)
+                ownerIndex = i
                 // Kilit açma penceresine yalnızca T_kabul üstü kareler girer (spec §5.4.1); sürdürme
                 // eşiğiyle geçen kötü-açı kareleri varlığı korur ama kilidi tek başına açmaz.
                 if score >= matcher.thresholds.accept { ownerRecognitions.add(now) }
                 threats.clear(trackID: ids[i])
             case .stranger:
-                if !isOwnerTrack { flag(threats.observe(trackID: ids[i], belowReject: true, now: now)) }
+                if isOwnerTrack {
+                    // Sahibin izinde OKUNABİLİR ve kesin yabancı bir yüz: koltuk el değiştirmiş
+                    // olabilir → çapayı bırak, tehdit say. Okunamayan yüz karar vermez.
+                    if readable {
+                        anchor.drop()
+                        ownerIndex = nil
+                        flag(threats.observe(trackID: ids[i], belowReject: true, now: now))
+                    } else {
+                        anchor.sustain(box: face.boundingBox, now: now)
+                    }
+                } else {
+                    flag(threats.observe(trackID: ids[i], belowReject: true, now: now))
+                }
             case .uncertain:
-                if !isOwnerTrack { flag(threats.observe(trackID: ids[i], belowReject: false, now: now)) }
+                if isOwnerTrack { anchor.sustain(box: face.boundingBox, now: now) }
+                else { flag(threats.observe(trackID: ids[i], belowReject: false, now: now)) }
             }
         }
+
+        // Yüz hiç görünmüyor ama kadrajda biri var: sahne boşalmadıysa çapayı taşı.
+        if detections.faces.isEmpty, !detections.bodies.isEmpty { anchor.carry(now: now) }
+        let anchored = anchor.isAlive(now: now)
 
         let bodyPresent = detections.bodies.contains { $0.boundingBox.height >= config.minBodyHeight }
         let anyPerson = !detections.faces.isEmpty || !detections.bodies.isEmpty
 
         // Kilit açma sayacı: kayan pencere (spec §5.4.1); tek kaçan kare sıfırlamaz.
         let recentRecognitions = ownerRecognitions.count(within: 1.0, now: now)
-        if ownerFace != nil || (ownerTrackRecent && recentRecognitions > 0) {
+        if ownerFace != nil || (anchored && recentRecognitions > 0) {
             // `present` kesin eşleşmedir (motorun varlık mantığı bunu kullanır); sayaç pencereden gelir.
             summary.ownerTrack = OwnerTrackState(recognizedFrameCount: recentRecognitions, present: ownerFace != nil)
         }
@@ -199,7 +234,9 @@ public final class VisionPipeline: @unchecked Sendable {
 
         summary.strangerFacePresent = strangerPresent
         summary.uncertainFacePresent = uncertainPresent
-        summary.bodyPresentBeyondThreshold = bodyPresent && ownerFace == nil && ownerTrackFace == nil
+        summary.ownerAnchored = anchored
+        // Çapa canlıyken kadrajdaki gövde sahibin kendi gövdesidir, yabancı değil.
+        summary.bodyPresentBeyondThreshold = bodyPresent && ownerFace == nil && ownerTrackFace == nil && !anchored
         summary.anyPersonPresent = anyPerson
         summary.blinkObservedWithin = lastBlink.map { now - $0 }
         summary.sceneEmptyFor = sceneEmptyDuration(now: now, anyPerson: anyPerson)
