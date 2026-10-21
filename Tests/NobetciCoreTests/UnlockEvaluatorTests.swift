@@ -14,6 +14,14 @@ private func readyFrame() -> FrameSummary {
     #expect(e.evaluate(frame: readyFrame(), settings: GuardSettings(), requestedTurn: .left, now: 10) == .unlock)
 }
 
+@Test func recentRecognitionsSufficeEvenIfThisFrameMissed() {
+    // Pencerede ≥5 tanıma varsa bu karede eşleşme olmaması kilit açmayı geciktirmemeli.
+    let e = UnlockEvaluator()
+    var f = readyFrame()
+    f.ownerTrack = OwnerTrackState(recognizedFrameCount: 6, present: false)
+    #expect(e.evaluate(frame: f, settings: GuardSettings(), requestedTurn: .left, now: 10) == .unlock)
+}
+
 @Test func keepsWaitingUntilEnoughOwnerFrames() {
     let e = UnlockEvaluator()
     var f = readyFrame()

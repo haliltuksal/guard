@@ -188,6 +188,19 @@ private func leave(_ e: inout GuardEngine) {
     #expect(ok.contains(.logEvent(.unlockedByPasscode)))
 }
 
+@Test func blinkPromptIsStickyForOneSecond() {
+    // "Göz kırp" istendikten sonra tek bir kaçan kare mesajı "Seni arıyorum"a düşürmemeli (titreme).
+    var e = started()
+    leave(&e)
+    _ = e.handle(.input)                        // locked
+    var ask = ownerFrame(at: 3.0); ask.blinkObservedWithin = nil
+    #expect(e.handle(.frame(ask)).contains(.showShield(.blink)))
+    var missed = FrameSummary.empty; missed.timestamp = 3.3     // kaçan kare → normalde "arıyorum"
+    #expect(e.handle(.frame(missed)).contains(.showShield(.blink)))   // 1 sn içinde yapışkan
+    var later = FrameSummary.empty; later.timestamp = 4.6
+    #expect(e.handle(.frame(later)).contains(.showShield(.searching)))
+}
+
 // Uyku / açılış ----------------------------------------------------------
 
 @Test func sleepLocksAndWakeStaysLocked() {

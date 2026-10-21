@@ -20,6 +20,8 @@ public struct GuardEngine: Sendable {
     private var requestedTurn: Turn = .left
     private var strangerStreak = 0   // T1 debounce: ardışık yabancı/belirsiz kare sayısı
     private static let strangerFramesToLock = 3
+    private var lastBlinkPromptAt: TimeInterval = -.greatestFiniteMagnitude
+    private static let promptStickiness: TimeInterval = 1.0   // "göz kırp" istemi tek kaçan karede düşmesin
 
     public init(clock: Clock,
                 settings: GuardSettings = GuardSettings(),
@@ -121,13 +123,17 @@ public struct GuardEngine: Sendable {
         if lockout.remaining(now: clock.now()) > 0 {
             return [.showShield(.retry(seconds: Int(lockout.remaining(now: clock.now()).rounded(.up))))]
         }
+        let message: ShieldMessage
         switch unlockEvaluator.evaluate(frame: f, settings: settings, requestedTurn: requestedTurn, now: f.timestamp) {
         case .unlock: return unlock(by: .unlockedByFace)
-        case .needBlink: return [.showShield(.blink)]
-        case .bystander: return [.showShield(.bystander)]
-        case .needGesture(let t): return [.showShield(.gesture(t))]
-        case .lowQuality, .keepWaiting: return [.showShield(.searching)]
+        case .needBlink: message = .blink; lastBlinkPromptAt = f.timestamp
+        case .bystander: message = .bystander
+        case .needGesture(let t): message = .gesture(t)
+        case .lowQuality, .keepWaiting:
+            // Yapışkan istem: az önce "göz kırp" denmişse tek kaçan kare mesajı "arıyorum"a düşürmesin.
+            message = (f.timestamp - lastBlinkPromptAt <= Self.promptStickiness) ? .blink : .searching
         }
+        return [.showShield(message)]
     }
 
     // MARK: Sensörler / sahne
@@ -257,6 +263,7 @@ public struct GuardEngine: Sendable {
     private mutating func lock(_ reason: LockReason, now: TimeInterval, bystander: Bool = false) -> [GuardEffect] {
         requestedTurn = [.left, .right, .up][Int(now.magnitude) % 3]
         strangerStreak = 0
+        lastBlinkPromptAt = -.greatestFiniteMagnitude
         state = .locked(LockedContext(reason: reason, since: now, bystanderPresent: bystander))
         var fx: [GuardEffect] = [.showShield(.searching), .setInputPolicy(.blockAll), .wakeKeep(true)]
         fx.append(log(.triggered(reason)))

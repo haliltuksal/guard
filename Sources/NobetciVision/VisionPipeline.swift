@@ -56,7 +56,7 @@ public final class VisionPipeline: @unchecked Sendable {
     private var blink = BlinkDetector()
 
     private let config: PipelineConfig
-    private var ownerConsecutive = 0
+    private var ownerRecognitions = RecentWindow()   // kilit açma: 1 sn içinde ≥5 tanıma (kayan)
     private var lastBlink: TimeInterval?
     private var lastPersonSeen: TimeInterval?
     private var lastFullAnalysis: TimeInterval = -.greatestFiniteMagnitude
@@ -122,8 +122,11 @@ public final class VisionPipeline: @unchecked Sendable {
             if r.stranger { strangerPresent = true }
         }
 
+        var ownerTrackFace: DetectedFace?   // sahip izindeki yüz (bu karede eşleşmese de): kırpma/kalite buradan okunur
+
         for (i, face) in detections.faces.enumerated() where face.boundingBox.height >= config.minFaceHeight {
             let isOwnerTrack = ownerTrackRecent && ids[i] == ownerTrackID
+            if isOwnerTrack { ownerTrackFace = face }
             guard face.landmarks5.count == 5,
                   let aligned = alignedFace(pixelBuffer: pixelBuffer, face: face, imageW: w, imageH: h),
                   let vector = try? embedder.embed(aligned) else {
@@ -135,6 +138,7 @@ public final class VisionPipeline: @unchecked Sendable {
                 ownerFace = face
                 ownerTrackID = ids[i]
                 ownerTrackLastSeen = now
+                ownerRecognitions.add(now)
                 threats.clear(trackID: ids[i])
             case .stranger:
                 if !isOwnerTrack { flag(threats.observe(trackID: ids[i], belowReject: true, now: now)) }
@@ -146,23 +150,27 @@ public final class VisionPipeline: @unchecked Sendable {
         let bodyPresent = detections.bodies.contains { $0.boundingBox.height >= config.minBodyHeight }
         let anyPerson = !detections.faces.isEmpty || !detections.bodies.isEmpty
 
-        if let owner = ownerFace {
-            ownerConsecutive += 1
-            summary.ownerTrack = OwnerTrackState(recognizedFrameCount: ownerConsecutive, present: true)
-            // Vision kalite ölçümü gece webcam'de 0,30–0,55 (min 0,295 ölçüldü); 0,25 güvenli taban.
+        // Kilit açma sayacı: kayan pencere (spec §5.4.1); tek kaçan kare sıfırlamaz.
+        let recentRecognitions = ownerRecognitions.count(within: 1.0, now: now)
+        if ownerFace != nil || (ownerTrackRecent && recentRecognitions > 0) {
+            // `present` kesin eşleşmedir (motorun varlık mantığı bunu kullanır); sayaç pencereden gelir.
+            summary.ownerTrack = OwnerTrackState(recognizedFrameCount: recentRecognitions, present: ownerFace != nil)
+        }
+        // Kalite, göz kırpma ve baş hareketi sahip İZİNDEKİ yüzden okunur — bu karede eşleşmese bile.
+        // Kırpma 100–300 ms sürer; yalnızca eşleşen karelerde dinlenirse kaçar (cihazda yaşandı).
+        if let owner = ownerFace ?? ownerTrackFace {
+            // Vision kalite ölçümü gece webcam'de 0,30–0,55 (min 0,21 ölçüldü); 0,25 taban.
             summary.ownerQualityOK = owner.quality >= 0.25 && owner.boundingBox.height >= PipelineConfig.minFaceHeight(for: .near)
             let ear = (owner.leftEyeAR + owner.rightEyeAR) / 2
             if blink.feed(ear: ear, now: now) { lastBlink = now }
             if config.strictMode, let turn = requestedTurn {
                 summary.strictGestureSatisfied = Self.gestureSatisfied(turn: turn, yaw: owner.yaw, pitch: owner.pitch)
             }
-        } else {
-            ownerConsecutive = 0
         }
 
         summary.strangerFacePresent = strangerPresent
         summary.uncertainFacePresent = uncertainPresent
-        summary.bodyPresentBeyondThreshold = bodyPresent && ownerFace == nil
+        summary.bodyPresentBeyondThreshold = bodyPresent && ownerFace == nil && ownerTrackFace == nil
         summary.anyPersonPresent = anyPerson
         summary.blinkObservedWithin = lastBlink.map { now - $0 }
         summary.sceneEmptyFor = sceneEmptyDuration(now: now, anyPerson: anyPerson)

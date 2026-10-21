@@ -24,9 +24,9 @@ public struct UnlockEvaluator: Sendable {
 
     public func evaluate(frame: FrameSummary, settings: GuardSettings,
                          requestedTurn: Turn, now: TimeInterval) -> UnlockDecision {
-        // 1) Sahip yeterince kare boyunca tanınmış olmalı.
-        guard let track = frame.ownerTrack, track.present,
-              track.recognizedFrameCount >= Self.framesRequired else {
+        // 1) Son 1 sn içinde ≥5 tanıma (kayan pencere). Bu karede eşleşme şart değil:
+        //    tek kaçan kare kilit açmayı geciktirmemeli.
+        guard let track = frame.ownerTrack, track.recognizedFrameCount >= Self.framesRequired else {
             return .keepWaiting
         }
         // 3) Karede başka bir yüz ya da gövde olmamalı → yanında biri varsa şifre gerekir.
