@@ -14,7 +14,7 @@ Masandan kalktığında Mac'ini **uyanık tutan**, başına **yabancı biri geç
 
 ## Kurulum (3 dakika)
 
-1. **[Releases](https://github.com/haliltuksal/guard/releases)** sayfasından en son `Nöbetçi-x.y.z.dmg` dosyasını indir.
+1. **[Releases](https://github.com/haliltuksal/guard/releases)** sayfasından en son `Nobetci-x.y.z.dmg` dosyasını indir.
 2. DMG'yi aç, **Nöbetçi**'yi **Applications** klasörüne sürükle.
 3. Nöbetçi'yi aç. macOS **"geliştirici doğrulanamadı"** diyecek — bu normal (App Store dışı, arkadaşlar arası sürüm):
    **Sistem Ayarları → Gizlilik ve Güvenlik** → aşağıda *"Nöbetçi engellendi"* satırının yanındaki **"Yine de Aç"**.
@@ -72,7 +72,7 @@ make test       # 97 test (Swift Testing)
 make coverage   # NobetciCore ≥ %90 kapısı
 make cert       # kendinden imzalı kod imzalama kimliği (bir kez)
 make install    # /Applications/Nöbetçi.app
-make dist       # Nöbetçi-<sürüm>.dmg
+make dist       # Nobetci-<sürüm>.dmg
 swift run nobetci-eval live 10   # kamera ile tanıma/eşik tanılaması
 ```
 

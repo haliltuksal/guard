@@ -9,7 +9,7 @@ APP="build/Nöbetçi.app"
 STAGING=$(mktemp -d)
 cp -R "$APP" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
-DMG="build/Nöbetçi-$VERSION.dmg"
+DMG="build/Nobetci-$VERSION.dmg"   # ASCII ad: GitHub/URL dostu (uygulama adı pakette Nöbetçi kalır)
 rm -f "$DMG"
 hdiutil create -volname "Nöbetçi" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
 rm -rf "$STAGING"
