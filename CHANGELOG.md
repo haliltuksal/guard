@@ -2,7 +2,10 @@
 
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/), sürümleme [SemVer](https://semver.org/lang/tr/).
 
-## [Yayınlanmamış]
+## [0.1.3] — 2026-10-21
+
+Yanlış alarmların kökü: sistem artık "yüzünü okuyamıyorum" ile "masadan kalktın"ı
+birbirinden ayırıyor.
 
 ### Düzeltilenler (karanlık oda)
 - **Pozlama normalleştirme:** karanlık odada, arkada parlak ekran varken yüz koyu kalıyor ve
