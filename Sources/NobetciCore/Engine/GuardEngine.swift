@@ -20,6 +20,7 @@ public struct GuardEngine: Sendable {
     private var requestedTurn: Turn = .left
     private var strangerStreak = 0   // T1 debounce: ardışık yabancı/belirsiz kare sayısı
     private static let strangerFramesToLock = 2   // pipeline iz başına zamanlıyor; burası yalnızca tek-kare arıza koruması
+    private var snapshotPolicy = SnapshotPolicy()
     private var lastBlinkPromptAt: TimeInterval = -.greatestFiniteMagnitude
     private static let promptStickiness: TimeInterval = 1.0   // "göz kırp" istemi tek kaçan karede düşmesin
 
@@ -70,6 +71,7 @@ public struct GuardEngine: Sendable {
         session = SessionRecord(started: clock.wallNow())
         ownerPresence = OwnerPresence()
         ownerPresence.seedPresent(now: clock.now())
+        snapshotPolicy.reset()
         state = .guarding(.present)
         var fx: [GuardEffect] = [.startSensors, .wakeKeep(true), .setInputPolicy(.passThrough)]
         fx.append(log(.guardStarted))
@@ -103,6 +105,8 @@ public struct GuardEngine: Sendable {
                     return lock(.facelessPerson, now: f.timestamp, bystander: true)
                 }
                 if newPresence == .present { return ownerReturnedWhileUnlocked() }
+                // Sen yokken kadraja giren kişinin fotoğrafı (hız sınırlı).
+                if f.anyPersonPresent, !ownerThisFrame { return capture(.personSeen, now: f.timestamp) }
                 return []
             } else {
                 // present → absent
@@ -120,6 +124,16 @@ public struct GuardEngine: Sendable {
     }
 
     private mutating func faceUnlockAttempt(_ f: FrameSummary) -> [GuardEffect] {
+        // Kilitliyken kadrajdaki kişi sen değilsen fotoğrafla (hız sınırlı).
+        var captured: [GuardEffect] = []
+        if f.anyPersonPresent, f.ownerTrack?.present != true {
+            captured = capture(.personSeen, now: f.timestamp)
+        }
+        if !captured.isEmpty { return captured + faceUnlockDecision(f) }
+        return faceUnlockDecision(f)
+    }
+
+    private mutating func faceUnlockDecision(_ f: FrameSummary) -> [GuardEffect] {
         if lockout.remaining(now: clock.now()) > 0 {
             return [.showShield(.retry(seconds: Int(lockout.remaining(now: clock.now()).rounded(.up))))]
         }
@@ -212,7 +226,7 @@ public struct GuardEngine: Sendable {
             return unlock(by: .unlockedByPasscode)
         }
         let wait = lockout.registerFailure(now: now)
-        var effects: [GuardEffect] = []
+        var effects: [GuardEffect] = capture(.wrongPasscode, now: now)
         effects.append(log(.wrongPasscode))
         effects.append(persist(active: true))
         effects.append(wait > 0 ? .showShield(.retry(seconds: Int(wait.rounded(.up)))) : .showShield(.searching))
@@ -260,12 +274,20 @@ public struct GuardEngine: Sendable {
 
     private var isAbsent: Bool { if case .guarding(.absent) = state { return true }; return false }
 
+    /// Fotoğraf etkisi (ayar açıksa ve hız sınırı izin veriyorsa).
+    private mutating func capture(_ reason: SnapshotReason, now: TimeInterval) -> [GuardEffect] {
+        let urgent = reason == .wrongPasscode
+        guard settings.captureSnapshots, snapshotPolicy.allow(now: now, urgent: urgent) else { return [] }
+        return [.captureSnapshot(reason)]
+    }
+
     private mutating func lock(_ reason: LockReason, now: TimeInterval, bystander: Bool = false) -> [GuardEffect] {
         requestedTurn = [.left, .right, .up][Int(now.magnitude) % 3]
         strangerStreak = 0
         lastBlinkPromptAt = -.greatestFiniteMagnitude
         state = .locked(LockedContext(reason: reason, since: now, bystanderPresent: bystander))
-        var fx: [GuardEffect] = [.showShield(.searching), .setInputPolicy(.blockAll), .wakeKeep(true)]
+        var fx: [GuardEffect] = capture(.locked(reason), now: now)
+        fx.append(contentsOf: [.showShield(.searching), .setInputPolicy(.blockAll), .wakeKeep(true)])
         fx.append(log(.triggered(reason)))
         fx.append(persist(active: true))
         return fx

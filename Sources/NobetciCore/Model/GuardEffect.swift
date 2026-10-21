@@ -31,6 +31,7 @@ public enum GuardEffect: Equatable, Sendable {
     case hideShield
     case setInputPolicy(CoreInputPolicy)
     case wakeKeep(Bool)
+    case captureSnapshot(SnapshotReason)   // sen yokken yaklaşanın fotoğrafı (şifreli, yalnızca cihazda)
     case logEvent(GuardLogKind)
     case notify(NotificationKind)
     case showReport(SessionRecord)

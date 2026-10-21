@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var reenrollCount = 0
     @State private var reenrollTarget = 50
     @State private var reenrollDone: Bool?
+    @State private var deletedPhotos: Int?
 
     init(model: AppModel) {
         self.model = model
@@ -21,6 +22,7 @@ struct SettingsView: View {
         TabView {
             general.tabItem { Label(L10n.t("settings.general"), systemImage: "gear") }
             detection.tabItem { Label(L10n.t("settings.detection"), systemImage: "sensor") }
+            photos.tabItem { Label(L10n.t("settings.photos"), systemImage: "photo") }
             unlock.tabItem { Label(L10n.t("settings.unlock"), systemImage: "faceid") }
             about.tabItem { Label(L10n.t("settings.about"), systemImage: "info.circle") }
         }
@@ -53,6 +55,21 @@ struct SettingsView: View {
             Toggle("Ekran tetikleyici", isOn: $settings.displayTrigger)
             Toggle("USB tetikleyici", isOn: $settings.usbTrigger)
             Toggle("Güç kaynağı tetikleyici", isOn: $settings.powerTrigger)
+        }.padding()
+    }
+
+    private var photos: some View {
+        Form {
+            Toggle("Sen yokken yaklaşanların fotoğrafını çek", isOn: $settings.captureSnapshots)
+            Picker("Saklama süresi", selection: $settings.snapshotRetentionDays) {
+                Text("7 gün").tag(7); Text("30 gün").tag(30); Text("90 gün").tag(90)
+            }
+            Text("Fotoğraflar şifrelenir ve yalnızca bu Mac'te kalır; internete gönderilmez.")
+                .font(.footnote).foregroundStyle(.secondary)
+            Button("Tüm fotoğrafları sil", role: .destructive) { deletedPhotos = model.deleteAllSnapshots() }
+            if let deletedPhotos {
+                Text("\(deletedPhotos) fotoğraf silindi.").font(.footnote).foregroundStyle(.secondary)
+            }
         }.padding()
     }
 

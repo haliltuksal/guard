@@ -5,7 +5,8 @@ Masandan kalktığında Mac'ini **uyanık tutan**, başına **yabancı biri geç
 - 🔒 Yabancı yüz, yaklaşan kişi, kapak oynatma, Mac'i kaldırma, kamerayı kapatma, USB/ekran takma → **ekran bulanır, girdi kapanır**
 - 👤 Sadece **senin yüzün** (ya da uygulama şifren) açar
 - 🔋 Nöbet boyunca Mac **uyumaz**, ekran koruyucu devreye girmez
-- 🕵️ **Hiçbir veri cihazından çıkmaz** — uygulamanın internet bağlantısı yoktur, fotoğraf çekmez
+- 📸 Sen yokken yaklaşanların **fotoğrafını çeker** — şifreli, yalnızca bu Mac'te; döndüğünde kimin geldiğini görürsün
+- 🕵️ **Hiçbir veri cihazından çıkmaz** — uygulamanın internet bağlantısı yoktur
 - 🧠 Yüz tanıma tamamen cihazda (Apple Neural Engine, ~1 ms)
 
 > **Gereksinimler:** Apple Silicon Mac (M1 ve sonrası), macOS 14 Sonoma veya üstü, dahili kamera.
@@ -34,7 +35,7 @@ Bitti. Menü çubuğunda bir **kalkan simgesi** göreceksin.
 | Geri döndüğünde | Kameraya bak → kilit **kendiliğinden** açılır; nöbet sürer |
 | Nöbeti bitirmek | Kalkan simgesi → **Buradayım** |
 | Yüz tanınmazsa | Kilit ekranında şifreni yaz, Return |
-| Sen yokken ne oldu? | "Buradayım" dediğinde olay listesi açılır |
+| Sen yokken ne oldu? | "Buradayım" dediğinde olay listesi **ve çekilen fotoğraflar** açılır |
 
 Nöbetteyken menüde **kamera · kapak · hareket · uyanık** göstergeleri yanar.
 
@@ -53,7 +54,8 @@ Nöbetteyken menüde **kamera · kapak · hareket · uyanık** göstergeleri yan
 ## Gizlilik
 
 - Yüzünün **fotoğrafı değil**, sadece sayısal özellikleri saklanır; AES-GCM ile şifreli, anahtar Keychain'de, iCloud'a gitmez.
-- Yabancıların yüzü **hiçbir şekilde saklanmaz**, fotoğraf çekilmez.
+- Sen yokken çekilen fotoğraflar AES-GCM ile **şifrelenir**, yalnızca bu Mac'te kalır ve saklama süresi dolunca silinir (varsayılan 30 gün). Ayarlar → Fotoğraflar'dan kapatabilir ya da hepsini silebilirsin.
+- Yabancıların yüz verisi tanıma için **saklanmaz**.
 - Uygulamada **ağ kodu yok**.
 - Kilit ekranında "Kamera etkin" yazar; yaklaşan kişi kameranın açık olduğunu görür.
 

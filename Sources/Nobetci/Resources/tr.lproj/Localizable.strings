@@ -58,3 +58,6 @@
 /* Rapor */
 "report.title" = "Sen Yokken Olanlar";
 "report.close" = "Kapat";
+
+/* Ayarlar — fotoğraflar */
+"settings.photos" = "Fotoğraflar";

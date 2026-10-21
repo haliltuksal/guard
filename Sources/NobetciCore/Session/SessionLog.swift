@@ -24,10 +24,23 @@ public struct SessionRecord: Equatable, Sendable, Codable {
     public var started: Date
     public var ended: Date?
     public var events: [GuardEventRecord]
-    public init(started: Date, ended: Date? = nil, events: [GuardEventRecord] = []) {
+    /// Bu nöbette çekilen fotoğrafların künyeleri (dosyalar şifreli, ayrı saklanır).
+    public var snapshots: [SnapshotRef]
+
+    public init(started: Date, ended: Date? = nil, events: [GuardEventRecord] = [], snapshots: [SnapshotRef] = []) {
         self.started = started
         self.ended = ended
         self.events = events
+        self.snapshots = snapshots
+    }
+
+    /// Eski oturum dosyalarında `snapshots` yoktur; eksikse boş kabul edilir.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        started = try c.decode(Date.self, forKey: .started)
+        ended = try c.decodeIfPresent(Date.self, forKey: .ended)
+        events = try c.decodeIfPresent([GuardEventRecord].self, forKey: .events) ?? []
+        snapshots = try c.decodeIfPresent([SnapshotRef].self, forKey: .snapshots) ?? []
     }
     public var duration: TimeInterval? { ended.map { $0.timeIntervalSince(started) } }
 }

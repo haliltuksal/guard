@@ -1,6 +1,7 @@
 import CoreVideo
 import CoreGraphics
 import CoreImage
+import ImageIO
 import Foundation
 import Vision
 import NobetciCore
@@ -70,6 +71,9 @@ public final class VisionPipeline: @unchecked Sendable {
     private let stateLock = NSLock()
     private var _requestedTurn: Turn?
     private var _locked = false
+    private var _capturing = false
+    private var _snapshot: Data?          // en son/en kaliteli aday (JPEG)
+    private var _snapshotAt: TimeInterval = -.greatestFiniteMagnitude
 
     public init(detector: FaceDetector, embedder: FaceEmbedder, config: PipelineConfig) {
         self.detector = detector
@@ -83,6 +87,19 @@ public final class VisionPipeline: @unchecked Sendable {
     public func setRequestedTurn(_ turn: Turn?) { stateLock.withLock { _requestedTurn = turn } }
     /// Kilit durumu; kilitliyken blink için her kare tam analiz yapılır (§6.2).
     public func setLocked(_ locked: Bool) { stateLock.withLock { _locked = locked } }
+
+    /// Sahip yokken/kilitliyken fotoğraf adayı tutulur (yalnızca o zaman kodlanır).
+    public func setCapturing(_ on: Bool) {
+        stateLock.withLock {
+            _capturing = on
+            if !on { _snapshot = nil }
+        }
+    }
+
+    /// Bekleyen fotoğrafı alır ve tüketir (motor `captureSnapshot` etkisi verince çağrılır).
+    public func consumeSnapshot() -> Data? {
+        stateLock.withLock { defer { _snapshot = nil }; return _snapshot }
+    }
 
     public func process(_ pixelBuffer: CVPixelBuffer, now: TimeInterval) -> PipelineOutput {
         let metrics = analyzer.analyze(gray: Self.downsampleGray(pixelBuffer))
@@ -174,6 +191,12 @@ public final class VisionPipeline: @unchecked Sendable {
             }
         }
 
+        // Fotoğraf adayı: yalnızca yakalama açıkken ve en fazla ~3/sn kodla (maliyet).
+        let shouldSnap = stateLock.withLock { _capturing && now - _snapshotAt >= 0.3 }
+        if shouldSnap, let jpeg = makeJPEG(from: pixelBuffer) {
+            stateLock.withLock { _snapshot = jpeg; _snapshotAt = now }
+        }
+
         summary.strangerFacePresent = strangerPresent
         summary.uncertainFacePresent = uncertainPresent
         summary.bodyPresentBeyondThreshold = bodyPresent && ownerFace == nil && ownerTrackFace == nil
@@ -202,6 +225,16 @@ public final class VisionPipeline: @unchecked Sendable {
         let ty = abs(observation.alignmentTransform.ty)
         let fraction = max(tx, ty) / max(width, 1)
         return scene.isShifted(translationFraction: Double(fraction))
+    }
+
+    /// Kareyi ~720 px genişliğe indirip JPEG'e kodlar (fotoğraf kaydı için).
+    private func makeJPEG(from pixelBuffer: CVPixelBuffer, maxWidth: CGFloat = 720, quality: CGFloat = 0.7) -> Data? {
+        let image = CIImage(cvPixelBuffer: pixelBuffer)
+        let scale = min(1, maxWidth / max(image.extent.width, 1))
+        let scaled = scale < 1 ? image.transformed(by: CGAffineTransform(scaleX: scale, y: scale)) : image
+        return ciContext.jpegRepresentation(of: scaled,
+                                            colorSpace: CGColorSpaceCreateDeviceRGB(),
+                                            options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: quality])
     }
 
     private func sceneEmptyDuration(now: TimeInterval, anyPerson: Bool) -> TimeInterval {

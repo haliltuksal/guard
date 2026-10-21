@@ -48,6 +48,8 @@ final class AppModel {
     private var camera: CameraSource?
     private var passcodeBuffer = ""
     private var currentSession: SessionRecord?
+    private var sessionSnapshots: [SnapshotRef] = []
+    static let snapshotPrefix = "snap-"
 
     // Seri olay kanalı: tüm kaynaklardan gelen olaylar FIFO sırayla motora ulaşır.
     private let events: AsyncStream<GuardEvent>
@@ -79,7 +81,10 @@ final class AppModel {
                 apply(effects)
                 let newState = await coordinator.state
                 state = newState
-                if case .locked = newState { pipeline?.setLocked(true) } else { pipeline?.setLocked(false) }
+                let locked: Bool = if case .locked = newState { true } else { false }
+                pipeline?.setLocked(locked)
+                // Fotoğraf adayı yalnızca sen yokken/kilitliyken tutulur (gereksiz kodlama yok).
+                pipeline?.setCapturing(locked || newState == .guarding(.absent))
             }
         }
     }
@@ -168,14 +173,21 @@ final class AppModel {
         case .hideShield: shield.hide(animated: true); passcodeBuffer = ""; passcodeCount = 0
         case .setInputPolicy(let p): inputFilter.setPolicy(Self.map(p))
         case .wakeKeep(let on): if on { try? wakeKeeper.start() } else { wakeKeeper.stop() }; sensorStatus.wakeKeep = on
+        case .captureSnapshot(let reason): captureSnapshot(reason)
         case .logEvent(let kind): appendLog(kind)
         case .notify(let kind): notifier.post(kind)
-        case .showReport(let s): lastReport = s; showReportWindow(s)
+        case .showReport(let s):
+            var merged = s
+            merged.snapshots = sessionSnapshots      // fotoğraf künyeleri uygulama katmanında tutulur
+            lastReport = merged
+            showReportWindow(merged)
         case .persist(let p): persist(p)
         }
     }
 
     private func startSensors() {
+        sessionSnapshots.removeAll()
+        fileStore.removeExpired(prefix: Self.snapshotPrefix, days: settings.snapshotRetentionDays)   // saklama süresi
         buildPipelineAndCamera()
         camera?.start()
         lidSensor.start(); sensorStatus.lid = lidSensor.isAvailable
@@ -211,6 +223,34 @@ final class AppModel {
     }
 
     nonisolated func markFrameArrived() { frameClock.mark() }
+
+    // MARK: Fotoğraf (sen yokken kim yaklaştı)
+
+    /// Bekleyen kamera karesini şifreleyip diske yazar. Ağ yok; dosya cihazdan çıkmaz.
+    private func captureSnapshot(_ reason: SnapshotReason) {
+        guard settings.captureSnapshots, let jpeg = pipeline?.consumeSnapshot() else { return }
+        let id = "\(Self.snapshotPrefix)\(Int(Date().timeIntervalSince1970 * 1000))"
+        do {
+            try fileStore.writeEncrypted(jpeg, to: "\(id).bin")
+            sessionSnapshots.append(SnapshotRef(id: id, at: Date(), reason: reason))
+        } catch {
+            // Disk dolu/yazılamıyor: koruma etkilenmez, fotoğraf atlanır.
+        }
+    }
+
+    /// Rapor için fotoğrafları çözer (şifreli dosyadan görüntüye).
+    func loadSnapshots(_ refs: [SnapshotRef]) -> [(ref: SnapshotRef, image: NSImage)] {
+        refs.compactMap { ref in
+            guard let data = try? fileStore.readEncrypted(Data.self, from: "\(ref.id).bin"),
+                  let image = NSImage(data: data) else { return nil }
+            return (ref, image)
+        }
+    }
+
+    func deleteAllSnapshots() -> Int {
+        sessionSnapshots.removeAll()
+        return fileStore.removeAll(prefix: Self.snapshotPrefix)
+    }
 
     // MARK: Şifre
 
@@ -272,8 +312,9 @@ final class AppModel {
     }
 
     private func showReportWindow(_ session: SessionRecord) {
-        reportPresenter.show(title: L10n.t("report.title"), size: NSSize(width: 460, height: 420)) {
-            ReportView(session: session) { [weak self] in self?.reportPresenter.close() }
+        let photos = loadSnapshots(session.snapshots)
+        reportPresenter.show(title: L10n.t("report.title"), size: NSSize(width: 520, height: 560)) {
+            ReportView(session: session, photos: photos) { [weak self] in self?.reportPresenter.close() }
         }
     }
 

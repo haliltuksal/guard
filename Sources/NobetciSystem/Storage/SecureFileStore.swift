@@ -57,6 +57,27 @@ public struct SecureFileStore {
         return settings
     }
 
+    /// Verilen önekli, `days` günden eski şifreli dosyaları siler (saklama süresi).
+    public func removeExpired(prefix: String, days: Int) {
+        guard days > 0, let files = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
+        let cutoff = Date().addingTimeInterval(-Double(days) * 86_400)
+        for url in files where url.lastPathComponent.hasPrefix(prefix) {
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if let modified, modified < cutoff { try? fm.removeItem(at: url) }
+        }
+    }
+
+    /// Verilen önekli tüm şifreli dosyaları siler ve kaç tane silindiğini döndürür.
+    @discardableResult
+    public func removeAll(prefix: String) -> Int {
+        guard let files = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return 0 }
+        var removed = 0
+        for url in files where url.lastPathComponent.hasPrefix(prefix) {
+            if (try? fm.removeItem(at: url)) != nil { removed += 1 }
+        }
+        return removed
+    }
+
     public func removeAll() throws {
         if fm.fileExists(atPath: directory.path) { try fm.removeItem(at: directory) }
     }

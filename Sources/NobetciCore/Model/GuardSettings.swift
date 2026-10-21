@@ -46,6 +46,9 @@ public struct GuardSettings: Codable, Equatable, Sendable {
     /// Canlılık: kilit açmak için göz kırpma iste. Kullanıcı kararı (2026-10-21): varsayılan KAPALI —
     /// tanıyınca açılır. Açıldığında fotoğrafla kandırmayı zorlaştırır.
     public var requireBlink: Bool = false
+    /// Sen yokken kadraja giren kişilerin fotoğrafı (şifreli, yalnızca cihazda, ağ yok).
+    public var captureSnapshots: Bool = true
+    public var snapshotRetentionDays: Int = 30
     public var historyRetentionDays: Int = 30
     public var startAtLogin: Bool = true
     public var hotKey: HotKeySpec = .default
@@ -55,6 +58,7 @@ public struct GuardSettings: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case returnBehavior, distance, lid, motion, facelessDetection, cameraShiftDetection
         case displayTrigger, usbTrigger, powerTrigger, strictMode, requireBlink
+        case captureSnapshots, snapshotRetentionDays
         case historyRetentionDays, startAtLogin, hotKey
     }
 
@@ -74,6 +78,8 @@ public struct GuardSettings: Codable, Equatable, Sendable {
         powerTrigger = try c.decodeIfPresent(Bool.self, forKey: .powerTrigger) ?? d.powerTrigger
         strictMode = try c.decodeIfPresent(Bool.self, forKey: .strictMode) ?? d.strictMode
         requireBlink = try c.decodeIfPresent(Bool.self, forKey: .requireBlink) ?? d.requireBlink
+        captureSnapshots = try c.decodeIfPresent(Bool.self, forKey: .captureSnapshots) ?? d.captureSnapshots
+        snapshotRetentionDays = try c.decodeIfPresent(Int.self, forKey: .snapshotRetentionDays) ?? d.snapshotRetentionDays
         historyRetentionDays = try c.decodeIfPresent(Int.self, forKey: .historyRetentionDays) ?? d.historyRetentionDays
         startAtLogin = try c.decodeIfPresent(Bool.self, forKey: .startAtLogin) ?? d.startAtLogin
         hotKey = try c.decodeIfPresent(HotKeySpec.self, forKey: .hotKey) ?? d.hotKey

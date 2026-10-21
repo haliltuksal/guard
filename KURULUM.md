@@ -23,6 +23,6 @@ ve tüm ayarlar silinir.
 
 ## Notlar
 
-- Hiçbir veri cihazından çıkmaz; uygulamanın internet bağlantısı yoktur.
+- Hiçbir veri cihazından çıkmaz; uygulamanın internet bağlantısı yoktur. Sen yokken yaklaşanların fotoğrafı şifreli olarak bu Mac'te saklanır (Ayarlar → Fotoğraflar).
 - MacBook kamerasında iPhone'daki gibi derinlik sensörü yoktur; bu bir gizlilik
   kalkanıdır, macOS kilit ekranının birebir yerini tutmaz.

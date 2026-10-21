@@ -51,7 +51,6 @@ Kendi Mac'ini korumak isteyen bireysel kullanıcılar. Uygulama DMG olarak dağ�
 - Korumadan bağımsız "yalnızca uyanık tut" modu (kullanıcı kararı)
 - **Sahte etkinlik ("aktif görünme"):** Slack/Teams gibi araçların okuduğu boşta kalma sayaçlarını sentetik klavye/fare olaylarıyla sıfırlamak. Kullanıcı gerçekte uzaktayken başkalarına masasındaymış izlenimi verdiği için **bilinçli olarak yapılmaz** (2026-10-20 kararı). Uygulama hiçbir koşulda kullanıcı adına girdi olayı üretmez; uyku engelleme yalnızca güç bildirimleriyle yapılır (§7.6).
 - Telefona bildirim, otomatik güncelleme, İngilizce arayüz, Intel Mac, birden fazla sahip
-- Fotoğraf çekme (kilit tetiklenince, yanlış şifrede ya da kameraya giren kişilerin) — kullanıcı kararıyla çıkarıldı (2026-10-20)
 
 ---
 
@@ -700,3 +699,15 @@ Deney betikleri `tools/probes/` altındadır.
 | Fiziksel müdahale | Ekran, USB/HID ve şarj kablosu değişiklikleri tetikler |
 | Sahte etkinlik | Yapılmaz: uygulama kullanıcı adına girdi üretmez; yalnızca uyku engellenir (§1.5, §7.6) |
 | Kalite çıtası | En profesyonel çözüm; maliyetten kısılmaz; varsayımla iş yapılmaz; testler yapılır |
+
+## 17. Fotoğraf (geri alınan karar, 2026-10-21)
+
+Kullanıcı isteğiyle geri eklendi: "Uzaktayım aktifken ve ben yokken hareket algılandığında veya yabancı bir yüz gördüğünde fotoğraf çeksin; döndüğümde kimlerin yaklaştığını göreyim."
+
+- **Ne zaman:** sahip yokken kadrajda kişi görülünce; her kilit tetikleyicisinde; yanlış şifrede. Sahip karşıdayken çekilmez.
+- **Hız sınırı:** en az 3 sn arayla, nöbet başına en fazla 50 (`SnapshotPolicy`, TDD).
+- **Nerede:** `~/Library/Application Support/Nöbetçi/snap-*.bin`, AES-GCM-256 şifreli (anahtar Keychain), ~720 px JPEG. **Ağ yok.**
+- **Saklama:** varsayılan 30 gün (7/30/90 seçilebilir); nöbet başında süresi dolanlar silinir. Ayarlar → Fotoğraflar'dan kapatma ve "tümünü sil".
+- **Görüntüleme:** "Buradayım" sonrası rapor penceresinde zaman ve sebep etiketli şerit.
+- **Şeffaflık:** kalkan kartında "Kamera etkin" yazar; nöbet dışında kamera kapalıdır (yeşil ışık söner).
+- **Not:** Ortak/çalışma alanlarında üçüncü kişilerin görüntüsünü kaydetmek yerel mevzuata (ör. KVKK) tabi olabilir; özellik kullanıcı tercihiyle açıktır ve kapatılabilir.

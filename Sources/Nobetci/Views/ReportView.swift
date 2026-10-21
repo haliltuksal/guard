@@ -4,6 +4,7 @@ import NobetciCore
 /// "Sen yokken olanlar" raporu: özet + olay zaman çizelgesi (fotoğraf yok).
 struct ReportView: View {
     let session: SessionRecord
+    var photos: [(ref: SnapshotRef, image: NSImage)] = []
     var onClose: () -> Void = {}
 
     var body: some View {
@@ -16,6 +17,28 @@ struct ReportView: View {
             Text(ReportBuilder.summary(session))
                 .font(.headline).foregroundStyle(.secondary)
                 .padding(.horizontal)
+
+            if !photos.isEmpty {
+                Text("Kimler yaklaştı (\(photos.count))")
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal).padding(.top, 10)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(photos, id: \.ref.id) { item in
+                            VStack(spacing: 4) {
+                                Image(nsImage: item.image)
+                                    .resizable().aspectRatio(contentMode: .fill)
+                                    .frame(width: 132, height: 99).clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                Text(item.ref.at, format: .dateTime.hour().minute().second())
+                                    .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+                                Text(label(item.ref.reason)).font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                    }.padding(.horizontal)
+                }
+            }
+
             Divider().padding(.vertical, 8)
             List(Array(session.events.enumerated()), id: \.offset) { _, event in
                 HStack(spacing: 12) {
@@ -27,6 +50,14 @@ struct ReportView: View {
             }
         }
         .frame(width: 460, height: 420)
+    }
+
+    private func label(_ reason: SnapshotReason) -> String {
+        switch reason {
+        case .personSeen: "kadrajda"
+        case .locked(let r): "kilit: \(self.reason(r))"
+        case .wrongPasscode: "yanlış şifre"
+        }
     }
 
     private func describe(_ kind: GuardLogKind) -> String {

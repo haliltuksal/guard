@@ -9,6 +9,8 @@ import Foundation
     #expect(s.facelessDetection && s.cameraShiftDetection && s.displayTrigger && s.usbTrigger && s.powerTrigger)
     #expect(!s.strictMode)
     #expect(!s.requireBlink)   // kullanıcı kararı (2026-10-21): tanıyınca aç, göz kırpma isteğe bağlı
+    #expect(s.captureSnapshots)                 // sen yokken yaklaşanların fotoğrafı (kullanıcı isteği)
+    #expect(s.snapshotRetentionDays == 30)
     #expect(s.historyRetentionDays == 30 && s.startAtLogin)
 }
 

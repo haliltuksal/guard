@@ -144,6 +144,55 @@ private func leave(_ e: inout GuardEngine) {
     #expect(contains(fx, lock: .lidAngle))
 }
 
+// Fotoğraf (sen yokken kim yaklaştı) -------------------------------------
+
+private func hasCapture(_ fx: [GuardEffect]) -> Bool {
+    fx.contains { if case .captureSnapshot = $0 { return true }; return false }
+}
+
+@Test func capturesWhenPersonSeenWhileOwnerAway() {
+    var e = started()
+    leave(&e)
+    var f = FrameSummary.empty; f.anyPersonPresent = true; f.timestamp = 2.1
+    #expect(e.handle(.frame(f)).contains(.captureSnapshot(.personSeen)))
+}
+
+@Test func doesNotCaptureWhileOwnerPresent() {
+    var e = started()
+    var f = ownerFrame(at: 0.1); f.anyPersonPresent = true
+    #expect(!hasCapture(e.handle(.frame(f))))
+}
+
+@Test func capturesOnLockTrigger() {
+    var e = started()
+    leave(&e)
+    #expect(hasCapture(e.handle(.input)))          // T3 kilidi → kim dokundu
+}
+
+@Test func capturesOnWrongPasscode() {
+    var e = started(verify: { $0 == "dogru" })
+    leave(&e)
+    _ = e.handle(.input)                            // locked
+    #expect(hasCapture(e.handle(.passcode("yanlis"))))
+}
+
+@Test func snapshotsAreRateLimitedAcrossFrames() {
+    var e = started()
+    leave(&e)
+    func person(_ t: TimeInterval) -> FrameSummary { var f = FrameSummary.empty; f.anyPersonPresent = true; f.timestamp = t; return f }
+    #expect(hasCapture(e.handle(.frame(person(2.1)))))
+    #expect(!hasCapture(e.handle(.frame(person(2.2)))))   // 3 sn dolmadı
+    #expect(hasCapture(e.handle(.frame(person(5.2)))))
+}
+
+@Test func capturingDisabledBySetting() {
+    var s = GuardSettings(); s.captureSnapshots = false
+    var e = started(settings: s)
+    leave(&e)
+    var f = FrameSummary.empty; f.anyPersonPresent = true; f.timestamp = 2.1
+    #expect(!hasCapture(e.handle(.frame(f))))
+}
+
 // Kilit açma -------------------------------------------------------------
 
 @Test func faceUnlockKeepsGuardingByDefault() {
