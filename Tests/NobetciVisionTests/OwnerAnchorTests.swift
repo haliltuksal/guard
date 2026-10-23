@@ -104,3 +104,34 @@ private let box = CGRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2)
     #expect(!a.canAdoptSoleFace(faceCount: 2, now: 0.8))      // ikinci yüz varsa hayır
     #expect(!a.canAdoptSoleFace(faceCount: 1, now: 9.0))      // pencere kapandıysa hayır
 }
+
+// Çelişki: sahibin izinde okunabilir ama "kesin yabancı" skorlu yüz. Koltuk el değiştirmiş
+// olabilir — ama duman, el ya da kupa da tek bir böyle kare üretir. Çapayı düşürmek için
+// çelişkinin sürmesi gerekir (review bulgusu: tek kare çapayı anında siliyordu).
+
+@Test func singleContradictingFrameDoesNotDropTheAnchor() {
+    var a = OwnerAnchor()
+    a.verify(trackID: 7, box: box, now: 0)
+    let drop = a.noteContradiction(now: 1.0)
+    #expect(!drop)
+    #expect(a.isAlive(now: 1.0))
+}
+
+@Test func persistentContradictionDropsTheAnchor() {
+    var a = OwnerAnchor()
+    a.verify(trackID: 7, box: box, now: 0)
+    _ = a.noteContradiction(now: 1.0)
+    let early = a.noteContradiction(now: 1.0 + OwnerAnchor.contradictionPersistence - 0.1)
+    #expect(!early)
+    let late = a.noteContradiction(now: 1.0 + OwnerAnchor.contradictionPersistence + 0.1)
+    #expect(late)                                          // gerçek koltuk değişimi sürer
+}
+
+@Test func normalReadClearsTheContradiction() {
+    var a = OwnerAnchor()
+    a.verify(trackID: 7, box: box, now: 0)
+    _ = a.noteContradiction(now: 1.0)                      // duman
+    a.clearContradiction()                                 // duman dağıldı, yüz yine okunuyor
+    let drop = a.noteContradiction(now: 1.0 + OwnerAnchor.contradictionPersistence + 0.5)
+    #expect(!drop)                                         // sayaç sıfırdan başladı
+}

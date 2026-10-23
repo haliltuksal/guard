@@ -79,3 +79,26 @@ import Testing
     let e = d.update(brightness: 0.05, now: 2.0); #expect(e)
     let f = d.update(brightness: 0.50, now: 2.1); #expect(!f)    // ışık yanınca hemen çık
 }
+
+// Kalkan ışığı: bir kez yanınca kalkan kapanana kadar yanık kalır. Yoksa beyaz ekran
+// odayı aydınlatır → "karanlık" algısı biter → ışık söner → oda kararır → 1,5 sn sonra
+// yeniden yanar: sürekli titreme (review bulgusu).
+
+@Test func shieldLightTurnsOnOnlyWhileShieldIsVisibleInTheDark() {
+    var l = ShieldLightLatch()
+    let hidden = l.update(dark: true, shieldVisible: false); #expect(!hidden)   // kalkan yokken ışık yok
+    let shown = l.update(dark: true, shieldVisible: true); #expect(shown)
+}
+
+@Test func shieldLightStaysOnWhenItsOwnGlowBrightensTheRoom() {
+    var l = ShieldLightLatch()
+    _ = l.update(dark: true, shieldVisible: true)
+    let lit = l.update(dark: false, shieldVisible: true); #expect(lit)          // kendi ışığı odayı aydınlattı: sönmez
+}
+
+@Test func shieldLightResetsWhenShieldHides() {
+    var l = ShieldLightLatch()
+    _ = l.update(dark: true, shieldVisible: true)
+    let unlocked = l.update(dark: false, shieldVisible: false); #expect(!unlocked)   // kilit açıldı
+    let nextLock = l.update(dark: false, shieldVisible: true); #expect(!nextLock)    // sonraki kilit aydınlıkta
+}

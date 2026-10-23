@@ -84,6 +84,7 @@ public final class VisionPipeline: @unchecked Sendable {
     /// Profile eklenmeyi bekleyen vektörler (ana aktörden gelir, kamera kuyruğunda uygulanır).
     private var _pendingProfileAdditions: [[Float]] = []
     private var _sceneDark = false
+    private var _darkReported: Bool?
 
     public init(detector: FaceDetector, embedder: FaceEmbedder, config: PipelineConfig) {
         self.detector = detector
@@ -112,6 +113,16 @@ public final class VisionPipeline: @unchecked Sendable {
     /// Oda karanlık mı (süreklilikle doğrulanmış)? Kamera pozlaması ve kalkan aydınlatması
     /// buna bakar.
     public var isSceneDark: Bool { stateLock.withLock { _sceneDark } }
+
+    /// Karanlık durumu değiştiyse yeni değeri, değişmediyse nil döner. Arayüz her karede
+    /// değil yalnızca değişimde güncellenir (saniyede ~30 gereksiz ana-aktör sıçraması yok).
+    public func consumeDarkChange() -> Bool? {
+        stateLock.withLock {
+            guard _darkReported != _sceneDark else { return nil }
+            _darkReported = _sceneDark
+            return _sceneDark
+        }
+    }
 
     /// Öğrenilen vektörü hemen devreye alır (sonraki nöbeti beklemeden).
     public func addProfileVector(_ vector: [Float]) {
@@ -225,19 +236,20 @@ public final class VisionPipeline: @unchecked Sendable {
             case .stranger:
                 if isOwnerTrack {
                     // Sahibin izinde OKUNABİLİR ve kesin yabancı bir yüz: koltuk el değiştirmiş
-                    // olabilir → çapayı bırak, tehdit say. Okunamayan yüz karar vermez.
-                    if readable {
+                    // olabilir — ama duman, el ya da kupa da tek bir böyle kare üretir. Çapa
+                    // ancak çelişki SÜRERSE düşer ve tehdit sayılır. Okunamayan yüz karar vermez.
+                    anchor.sustain(box: face.boundingBox, now: now)
+                    if readable, anchor.noteContradiction(now: now) {
                         anchor.drop()
                         ownerIndex = nil
                         flag(threats.observe(trackID: ids[i], belowReject: true, now: now))
-                    } else {
-                        anchor.sustain(box: face.boundingBox, now: now)
                     }
                 } else {
                     flag(threats.observe(trackID: ids[i], belowReject: true, now: now))
                 }
             case .uncertain:
-                if isOwnerTrack { anchor.sustain(box: face.boundingBox, now: now) }
+                // Belirsiz skor "kesin yabancı" değildir: süren bir çelişkiyi sıfırlar.
+                if isOwnerTrack { anchor.sustain(box: face.boundingBox, now: now); anchor.clearContradiction() }
                 else { flag(threats.observe(trackID: ids[i], belowReject: false, now: now)) }
             }
         }
@@ -267,7 +279,7 @@ public final class VisionPipeline: @unchecked Sendable {
             // Vision kalite ölçümü gece webcam'de 0,30–0,55 (min 0,21 ölçüldü); 0,25 taban.
             // Kalite tabanı ışığa göre: karanlıkta Vision'ın kalite ölçümü herkes için düşer,
             // sabit taban sahibi kilit dışında bırakıyordu (arkadaş geri bildirimi).
-            let floor = QualityFloor.value(brightness: metrics.brightness)
+            let floor = dark ? QualityFloor.dark : QualityFloor.normal
             summary.ownerQualityOK = owner.quality >= floor && owner.boundingBox.height >= PipelineConfig.minFaceHeight(for: .near)
             let ear = (owner.leftEyeAR + owner.rightEyeAR) / 2
             if blink.feed(ear: ear, now: now) { lastBlink = now }

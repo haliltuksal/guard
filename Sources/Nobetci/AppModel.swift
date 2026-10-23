@@ -7,12 +7,6 @@ import NobetciSystem
 /// Uygulamanın kompozisyon kökü ve olay döngüsü. Tüm adaptörleri kurar, kamera/
 /// sensör/girdi geri çağırımlarını koordinatöre (GuardEngine) bağlar ve motorun
 /// ürettiği etkileri adaptörlere dağıtır. Görünümler bu @Observable durumu izler.
-/// Kamera geri çağırımı ana aktör dışında çalışır; kameraya oradan erişebilmek için
-/// küçük bir taşıyıcı. Yalnızca kurulumda yazılır, sonra okunur.
-final class CameraBox: @unchecked Sendable {
-    var camera: CameraSource?
-}
-
 @MainActor
 @Observable
 final class AppModel {
@@ -31,6 +25,9 @@ final class AppModel {
     var profileNeedsRefresh = false
     /// Oda karanlık ve kilitliyiz: kalkan ekranı aydınlatıp yüzü görünür kılsın.
     var shieldNeedsLight = false
+    private var sceneDark = false
+    private var shieldVisible = false
+    private var lightLatch = ShieldLightLatch()
 
     struct SensorStatus: Equatable {
         var camera = false, lid = false, accelerometer = false, wakeKeep = false
@@ -198,7 +195,10 @@ final class AppModel {
             shieldMessage = m
             if case .gesture(let t) = m { pipeline?.setRequestedTurn(t) } else { pipeline?.setRequestedTurn(nil) }
             shield.show()
-        case .hideShield: shield.hide(animated: true); passcodeBuffer = ""; passcodeCount = 0
+            shieldVisible = true; refreshShieldLight()
+        case .hideShield:
+            shield.hide(animated: true); passcodeBuffer = ""; passcodeCount = 0
+            shieldVisible = false; refreshShieldLight()
         case .setInputPolicy(let p): inputFilter.setPolicy(Self.map(p))
         case .wakeKeep(let on): if on { try? wakeKeeper.start() } else { wakeKeeper.stop() }; sensorStatus.wakeKeep = on
         case .captureSnapshot(let reason): captureSnapshot(reason)
@@ -499,8 +499,6 @@ final class AppModel {
                                         cameraShiftEnabled: settings.cameraShiftDetection)
             let builtPipeline = VisionPipeline(detector: FaceDetector(), embedder: embedder, config: config)
             self.pipeline = builtPipeline
-            // Kamera kendi kare geri çağırımından erişilsin (ana aktör dışı): küçük kutu.
-            let cameraBox = CameraBox()
             let builtCamera = CameraSource(
                 onFrame: { [weak self] buffer, _ in
                     self?.markFrameArrived()   // VARIŞI işaretle (işleme süresini değil): watchdog kamerayı ölçer
@@ -511,13 +509,12 @@ final class AppModel {
                     guard let self else { return }
                     if let summary = output.summary { self.sendFromAnywhere(.frame(summary)) }
                     if let health = output.cameraHealth { self.sendFromAnywhere(.cameraHealth(health)) }
-                    // Karanlıkta: kamerayı uzun pozlamaya al, kalkanı ışık kaynağı yap.
-                    let dark = builtPipeline.isSceneDark
-                    cameraBox.camera?.setLowLight(dark)
-                    Task { @MainActor [weak self] in self?.shieldNeedsLight = dark }
+                    // Karanlık değiştiyse (her karede değil): kalkan ışık kaynağı olsun mu?
+                    if let dark = builtPipeline.consumeDarkChange() {
+                        Task { @MainActor [weak self] in self?.sceneDark = dark; self?.refreshShieldLight() }
+                    }
                 },
                 onInterruption: { [weak self] in self?.sendFromAnywhere(.cameraHealth(.lost)) })
-            cameraBox.camera = builtCamera
             self.camera = builtCamera
             try? self.camera?.configure()
             self.camera?.start()
@@ -544,6 +541,13 @@ final class AppModel {
         }
         try? fileStore.writeEncrypted(adaptive, to: Self.adaptiveProfileFile)
         pipeline?.addProfileVector(vector)      // sonraki nöbeti bekleme, hemen geçerli olsun
+    }
+
+    /// Kalkan ışığı: karanlıkta kalkan görünürken yanar, kalkan kapanana kadar sönmez
+    /// (kendi ışığının odayı aydınlatıp söndürdüğü titreme döngüsü olmasın).
+    private func refreshShieldLight() {
+        let on = lightLatch.update(dark: sceneDark, shieldVisible: shieldVisible)
+        if on != shieldNeedsLight { shieldNeedsLight = on }   // değişmeyen değeri yazıp görünümü tetikleme
     }
 
     // MARK: Yardımcılar

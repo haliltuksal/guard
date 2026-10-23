@@ -24,6 +24,9 @@ public struct OwnerAnchor: Sendable, Equatable {
     /// Yüz hiç görünmezken sahnenin dolu olmasıyla çapanın taşınabileceği üst sınır.
     /// Sonsuz değil: yüzünü hiç göstermeyen birinin sahipten sayılması sınırlı kalsın.
     public static let carryLimit: TimeInterval = 600
+    /// Sahibin izinde okunabilir ve "kesin yabancı" skorlu yüz bu kadar sürerse çapa düşer.
+    /// Gerçek koltuk değişimi sürer; duman, el ya da kupa tek tük kare üretir.
+    public static let contradictionPersistence: TimeInterval = 1.5
 
     public private(set) var trackID: Int?
     public private(set) var box: CGRect = .zero
@@ -31,6 +34,8 @@ public struct OwnerAnchor: Sendable, Equatable {
     public private(set) var lastSeen: TimeInterval = -.greatestFiniteMagnitude
     /// Yüzün en son gerçekten tanındığı an — taşıma üst sınırı buradan sayılır.
     public private(set) var lastVerified: TimeInterval = -.greatestFiniteMagnitude
+    /// Çelişkinin (sahip izinde okunabilir yabancı skor) başladığı an; yoksa nil.
+    private var contradictionSince: TimeInterval?
 
     public init() {}
 
@@ -43,6 +48,7 @@ public struct OwnerAnchor: Sendable, Equatable {
 
     /// Sahip bu karede tanındı: çapayı bu ize bağla (en güçlü kanıt).
     public mutating func verify(trackID id: Int, box b: CGRect, now: TimeInterval) {
+        contradictionSince = nil
         trackID = id
         box = b
         lastSeen = now
@@ -87,7 +93,24 @@ public struct OwnerAnchor: Sendable, Equatable {
         return true
     }
 
+    /// Sahibin izinde okunabilir ama "kesin yabancı" skorlu bir kare görüldü. Çelişki
+    /// `contradictionPersistence` boyunca sürdüyse `true` döner: çapa düşürülmeli.
+    /// Sürmediyse çapayı yaşatır (tek kareyle karar verilmez).
+    public mutating func noteContradiction(now: TimeInterval) -> Bool {
+        let since = contradictionSince ?? now
+        contradictionSince = since
+        if now - since >= Self.contradictionPersistence { return true }
+        lastSeen = now
+        return false
+    }
+
+    /// Sahibin izi yeniden normal okundu (tanındı ya da okunamadı ama çelişmedi).
+    public mutating func clearContradiction() {
+        contradictionSince = nil
+    }
+
     public mutating func drop() {
+        contradictionSince = nil
         trackID = nil
         box = .zero
         lastSeen = -.greatestFiniteMagnitude

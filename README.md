@@ -91,7 +91,7 @@ Xcode gerekmez; Command Line Tools + Swift 6 yeter. Yüz modeli için Python 3.1
 ```bash
 git clone https://github.com/haliltuksal/guard.git && cd guard
 make model      # FaceNet → Core ML (bir kez; ~1 dk, internet gerekir)
-make test       # 153 test (Swift Testing)
+make test       # 159 test (Swift Testing)
 make coverage   # NobetciCore ≥ %90 kapısı
 make cert       # kendinden imzalı kod imzalama kimliği (bir kez)
 make install    # /Applications/Nöbetçi.app

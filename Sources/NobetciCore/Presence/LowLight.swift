@@ -42,3 +42,21 @@ public struct LowLightDetector: Sendable {
 
     public var dark: Bool { isDark }
 }
+
+/// Kalkan ışığının kararı: karanlıkta kalkan görünürken yanar ve **kalkan kapanana kadar**
+/// yanık kalır.
+///
+/// Neden kilit (latch): beyaz kalkan odayı aydınlatır; "karanlık" algısı bitince ışık
+/// sönseydi oda yeniden kararır, 1,5 sn sonra ışık yine yanardı — sürekli titreme. Işığın
+/// işi yalnızca kilitliyken yüzü aydınlatmak; kilit açılınca sıfırlanır.
+public struct ShieldLightLatch: Sendable {
+    private var on = false
+
+    public init() {}
+
+    public mutating func update(dark: Bool, shieldVisible: Bool) -> Bool {
+        if !shieldVisible { on = false; return false }
+        if dark { on = true }
+        return on
+    }
+}

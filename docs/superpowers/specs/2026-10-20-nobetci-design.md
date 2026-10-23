@@ -839,14 +839,25 @@ duruyo". Gönderdiği kare neredeyse zifiri.
 3. Webcam'de kızılötesi aydınlatma yok (Face ID'den farkı): görünür ışık yoksa yüz yok.
 
 **Çözüm:**
-- **Uzun pozlama:** `LowLightDetector` 1,5 sn sürekli karanlık görürse `CameraSource`
-  en uzun kare süresini 1/15 sn'ye çıkarır; otomatik pozlama ışığı daha uzun toplar.
-  macOS'ta webcam için elimizdeki tek gerçek kaldıraç budur (pozlama yanlılığı ve düşük
-  ışık takviyesi iOS'a özel). Işık yanınca anında geri döner.
+- ~~Uzun pozlama~~ — **geri alındı (2026-10-23, ölçümle):** MacBook Pro kamerasının
+  formatı 15–30 fps ve `activeVideoMaxFrameDuration` zaten varsayılan olarak 1/15 sn. Kod
+  değeri olduğu yere yazıyordu; etkisizdi. Cihaz yapılandırması yakalanamayan ObjC istisnası
+  riski taşıdığından çıkarıldı. Pozlama yanlılığı ve düşük ışık takviyesi macOS'ta yok.
 - **Uyarlanan kalite tabanı** (`QualityFloor`): karanlıkta 0,12. Eşiğin işi bulanık
   fotoğrafla kandırmayı zorlaştırmak; karanlıkta saldırganın kesiti de aynı ölçüde kötüdür.
 - **Ekran ışık kaynağı:** kilitliyken oda karanlıksa kalkan geniş, sıcak-beyaz bir zemine
   döner ve yüzü aydınlatır. İçerik yine gizlidir; kart koyu zemine geçip okunur kalır.
+  **Kilitli kalır** (`ShieldLightLatch`): bir kez yanınca kalkan kapanana kadar sönmez.
+  Yoksa kendi ışığı odayı aydınlatır, "karanlık" algısı biter, ışık söner, oda kararır ve
+  1,5 sn sonra yine yanar — titreme döngüsü (review bulgusu).
+- **Tek "karanlık" kaynağı:** kalite tabanı da `LowLightDetector`'ın süreklilikli kararını
+  kullanır (önce anlık parlaklığa bakıyordu; iki karar farklı sinyalden çıkıyordu).
+
+**Çelişki sürekliliği (review bulgusu):** §18'deki "sahibin izinde okunabilir ve kesin
+yabancı yüz çapayı düşürür" kuralı tek karede uygulanıyordu. Duman, el ya da kupa böyle bir
+kare üretebilir. Artık çelişki `OwnerAnchor.contradictionPersistence` (1,5 sn) sürerse çapa
+düşer ve tehdit sayılır; belirsiz skorlu ya da tanınan kare çelişkiyi sıfırlar. Bedeli: koltuk
+değişiminde T1 ~1,5 sn gecikir. Farklı bir izden gelen yabancı yüz bundan etkilenmez.
 - (§20'deki pozlama normalleştirme ve şifreyle öğrenme bu sorunun diğer yarısıdır.)
 
 **Kapak tetikleyicisi hakkında:** Aynı kullanıcı "kapağı oynatıyorum, kilitlenmiyor" dedi.

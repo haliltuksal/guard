@@ -2,7 +2,9 @@
 
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/), sürümleme [SemVer](https://semver.org/lang/tr/).
 
-## [Yayınlanmamış]
+## [0.1.4] — 2026-10-23
+
+İndirilen uygulamanın açılmaması (tek komutluk doğrulamalı kurulum) ve loş oda.
 
 ### Düzeltilenler (kurulum)
 - **"Nöbetçi Açılmadı" — indirilen uygulama açılmıyordu.** Kök neden: uygulama Apple'ın
@@ -17,12 +19,24 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/), sürümleme [Se
   - README ve KURULUM, macOS 15/26'nın gerçekte gösterdiği adımlarla yeniden yazıldı.
 
 ### Düzeltilenler (loş oda — ikinci kullanıcının geri bildirimi)
-- **Uzun pozlama:** oda 1,5 sn sürekli karanlıksa kamera en uzun kare süresi 1/15 sn'ye
-  çıkar; görüntü aydınlanır. Işık yanınca anında geri döner.
 - **Kalite tabanı ışığa uyarlanıyor** (karanlıkta 0,12): Vision'ın kalite ölçümü karanlıkta
-  herkes için düşüyor, sabit taban sahibi kilit dışında bırakıyordu.
+  herkes için düşüyor, sabit 0,25 taban sahibi kilit dışında bırakıyordu. "Karanlık" kararı
+  tek kaynaktan (1,5 sn süreklilikle) veriliyor.
 - **Ekran ışık kaynağı:** kilitliyken oda karanlıksa kalkan beyaza döner ve yüzü aydınlatır
-  (webcam'de kızılötesi yoktur; görünür ışık gerekir). İçerik yine gizli kalır.
+  (webcam'de kızılötesi yoktur; görünür ışık gerekir). İçerik yine gizli kalır. Işık bir kez
+  yanınca **kalkan kapanana kadar sönmez** — yoksa kendi ışığı odayı aydınlatıp "karanlık"
+  algısını bitirir ve 1,5 sn'de bir yanıp sönerdi.
+- **Duman, el, kupa çapayı tek karede düşürmüyor:** sahibin izinde okunabilir ama "kesin
+  yabancı" skorlu yüz artık ancak **1,5 sn sürerse** çapayı düşürüp tehdit sayılıyor. Gerçek
+  koltuk değişimi sürer; duman tek tük kare üretir.
+- Arayüz karanlık değişimini her karede değil, yalnızca değişince alıyor (saniyede ~30
+  gereksiz ana-aktör sıçraması kalktı).
+
+### Kaldırılanlar
+- **"Uzun pozlama" kodu** (bu sürümden önce `main`'deydi, hiç yayımlanmadı). Ölçüldü:
+  MacBook Pro kamerasının formatı 15–30 fps ve en uzun kare süresi **zaten varsayılan olarak
+  1/15 sn** — kod hiçbir şeyi değiştirmiyordu. Önceki not "görüntü aydınlanır" diyordu; yanlıştı.
+  Etkisiz cihaz yapılandırması da yakalanamayan ObjC istisnası riski taşıdığı için çıkarıldı.
 
 ## [0.1.3] — 2026-10-21
 
