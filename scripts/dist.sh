@@ -23,4 +23,12 @@ DMG="build/Nobetci-$VERSION.dmg"   # ASCII ad: GitHub/URL dostu (uygulama adı p
 rm -f "$DMG"
 hdiutil create -volname "Nöbetçi" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
 rm -rf "$STAGING"
+
+# install.sh sabit adları indirir (releases/latest/download/Nobetci.dmg + .sha256).
+# Bu iki dosya her sürüme yüklenmezse tek komutluk kurulum 404 verir.
+cp "$DMG" build/Nobetci.dmg
+( cd build && shasum -a 256 Nobetci.dmg > Nobetci.dmg.sha256 )
+
 echo "oluşturuldu: $DMG"
+echo "             build/Nobetci.dmg + build/Nobetci.dmg.sha256 (install.sh için)"
+echo "yayın: gh release create v$VERSION $DMG build/Nobetci.dmg build/Nobetci.dmg.sha256 …"

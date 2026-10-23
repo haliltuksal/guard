@@ -15,15 +15,34 @@ Masandan kalktığında Mac'ini **uyanık tutan**, başına **yabancı biri geç
 
 ## Kurulum (3 dakika)
 
-1. **[Releases](https://github.com/haliltuksal/guard/releases)** sayfasından en son `Nobetci-x.y.z.dmg` dosyasını indir.
-2. DMG'yi aç, **Nöbetçi**'yi **Applications** klasörüne sürükle.
-3. Nöbetçi'yi aç. macOS **"geliştirici doğrulanamadı"** diyecek — bu normal (App Store dışı, Apple tarafından notarize edilmemiş sürüm):
-   **Sistem Ayarları → Gizlilik ve Güvenlik** → aşağıda *"Nöbetçi engellendi"* satırının yanındaki **"Yine de Aç"**.
-4. Açılan **kurulum sihirbazı**nda:
-   - **İzinler:** Kamera, Erişilebilirlik ve Bildirimler — çıkan pencerelerde izin ver.
-     (Erişilebilirlik iznini verdikten sonra uygulamayı bir kez kapatıp açman gerekebilir.)
-   - **Şifre:** En az 6 karakter. Yüzün tanınmazsa bununla açarsın.
-   - **Yüz kaydı:** Kameraya bak, başını yavaşça çevir (50 kare toplanır, ~10 sn).
+### Tek komut — önerilen
+
+**Terminal**'i aç (⌘Space → "Terminal") ve şunu yapıştır:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/haliltuksal/guard/main/install.sh | bash
+```
+
+Betik en son sürümü indirir, **SHA-256 özetini ve kod imzasını doğrular**, `/Applications`'a kurar ve açar. "Açılmadı" penceresi çıkmaz. Güncellemek için aynı komutu tekrar çalıştır.
+
+### Ya da DMG ile
+
+1. **[Releases](https://github.com/haliltuksal/guard/releases)** sayfasından `Nobetci.dmg`'yi indir, aç, **Nöbetçi**'yi **Applications**'a sürükle.
+2. Nöbetçi'yi aç. macOS **"Nöbetçi Açılmadı"** penceresi gösterecek — **Bitti**'ye bas (*Çöp Sepeti'ne Taşı*'ya basma).
+3. **Sistem Ayarları → Gizlilik ve Güvenlik** → en alta kaydır → *"Nöbetçi … engellendi"* satırının yanındaki **Yine de Aç** → parolanı gir.
+4. Nöbetçi'yi tekrar aç → çıkan pencerede yine **Yine de Aç**.
+
+> Kısa yol: Terminal'de `xattr -dr com.apple.quarantine /Applications/Nöbetçi.app` — sonra normal aç.
+
+**Bu pencere neden çıkıyor?** Nöbetçi Apple'ın noter onayından (*notarization*) geçmiyor; bunun için ücretli bir Apple Developer ID gerekir. Tarayıcıyla indirilen uygulamaya macOS bir "karantina" işareti koyar ve ilk açılışta noter bileti arar. macOS 15'ten beri bu pencerede "Aç" düğmesi de yok. Uygulama zararlı değil; kaynak kodun tamamı bu depoda. Kurulum betiği Apple'ın yaptığı kontrolün yerine indirilen dosyanın SHA-256 özetini ve imzasını doğrular, tutmazsa hiçbir şey kurmaz.
+
+### İlk açılış
+
+Açılan **kurulum sihirbazı**nda:
+- **İzinler:** Kamera, Erişilebilirlik ve Bildirimler — çıkan pencerelerde izin ver.
+  (Erişilebilirlik iznini verdikten sonra uygulamayı bir kez kapatıp açman gerekebilir.)
+- **Şifre:** En az 6 karakter. Yüzün tanınmazsa bununla açarsın.
+- **Yüz kaydı:** Kameraya bak, başını yavaşça çevir (50 kare toplanır, ~10 sn).
 
 Bitti. Menü çubuğunda bir **kalkan simgesi** göreceksin.
 
@@ -72,11 +91,11 @@ Xcode gerekmez; Command Line Tools + Swift 6 yeter. Yüz modeli için Python 3.1
 ```bash
 git clone https://github.com/haliltuksal/guard.git && cd guard
 make model      # FaceNet → Core ML (bir kez; ~1 dk, internet gerekir)
-make test       # 119 test (Swift Testing)
+make test       # 153 test (Swift Testing)
 make coverage   # NobetciCore ≥ %90 kapısı
 make cert       # kendinden imzalı kod imzalama kimliği (bir kez)
 make install    # /Applications/Nöbetçi.app
-make dist       # Nobetci-<sürüm>.dmg
+make dist       # Nobetci-<sürüm>.dmg + Nobetci.dmg + Nobetci.dmg.sha256
 swift run nobetci-eval live 10   # kamera ile tanıma/eşik tanılaması
 ```
 
@@ -86,6 +105,8 @@ swift run nobetci-eval live 10   # kamera ile tanıma/eşik tanılaması
 | `NobetciVision` | Kamera karesi → `FrameSummary` (Apple Vision + Core ML yüz tanıma) |
 | `NobetciSystem` | macOS adaptörleri: sensörler, girdi filtresi, kalkan, güç, launchd, Keychain |
 | `Nobetci` | SwiftUI arayüz + parçaları bağlayan `AppModel` |
+
+**Yayın kuralı:** her sürüme `Nobetci.dmg` ve `Nobetci.dmg.sha256` de yüklenmeli — `install.sh` bu sabit adları `releases/latest/download/` üzerinden indirir; eksik olursa tek komutluk kurulum 404 verir. `make dist` çıktısındaki `gh release create` satırı üçünü birden yükler.
 
 Tasarım: `docs/superpowers/specs/` · Plan: `docs/superpowers/plans/` · Model: `docs/model-evaluation.md` · Doğrulama: `docs/test-report.md`
 

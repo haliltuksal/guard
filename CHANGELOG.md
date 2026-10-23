@@ -4,6 +4,18 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.0.0/), sürümleme [Se
 
 ## [Yayınlanmamış]
 
+### Düzeltilenler (kurulum)
+- **"Nöbetçi Açılmadı" — indirilen uygulama açılmıyordu.** Kök neden: uygulama Apple'ın
+  noter onayından geçmiyor (`syspolicy_check`: *Notary Ticket Missing — Fatal*; Developer ID
+  yok). Tarayıcıyla indirilene macOS karantina işareti koyup noter bileti arıyor; macOS 15+
+  pencerede "Aç" düğmesi de sunmuyor.
+  - **Tek komutluk kurulum** (`install.sh`): curl ile indirir (karantina işareti konmaz),
+    **SHA-256 özetini ve kod imzasını doğrular**, tutmazsa hiçbir şey kurmaz. Apple
+    Silicon ve macOS 14+ denetler; `/Applications` yazılamıyorsa `~/Applications`'a kurar;
+    eski, karantinalı kurulumu temizler.
+  - Her sürüm sabit adlı `Nobetci.dmg` + `Nobetci.dmg.sha256` de içeriyor (`make dist`).
+  - README ve KURULUM, macOS 15/26'nın gerçekte gösterdiği adımlarla yeniden yazıldı.
+
 ### Düzeltilenler (loş oda — ikinci kullanıcının geri bildirimi)
 - **Uzun pozlama:** oda 1,5 sn sürekli karanlıksa kamera en uzun kare süresi 1/15 sn'ye
   çıkar; görüntü aydınlanır. Işık yanınca anında geri döner.
